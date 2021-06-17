@@ -37,4 +37,3 @@ using bazel and emsdk.
      sure Chrome has these two features
      [turned on](https://drive.google.com/file/d/13hqGwBOTJFoqMQVUAn_tiYp-uqQN_NUq/view?usp=sharing)
      from `chrome://flags`.
-
