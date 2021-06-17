@@ -11,15 +11,15 @@ using bazel and emsdk.
    [patch](https://github.com/jinjingforever/tflite-support/blob/master/WORKSPACE#L169-L170)
    for the com_google_glog library. Without it, the emscripten build will fail
    on Mac/Linux. The glog
-   [0.5](https://github.com/google/glog/releases/tag/v0.5.0) release has a fix
-   for this issue, but it requires some TFLite code refactoring. I will talk to
-   the TFLite team about this. For now we will just use the patch.
+   [v0.5.0 release](https://github.com/google/glog/releases/tag/v0.5.0) has a
+   fix for this issue, but it requires some TFLite code refactoring. I will talk
+   to the TFLite team about this. For now we will just use the patch.
 3. The cpp code is
    [here](https://github.com/jinjingforever/tflite-support/tree/master/tensorflow_lite_support/web/tflite_model_runner/cc).
    - `tflite_model_runner.*` implement the model runner.
    - `tflite_model_runner_wasm.cc` sets up the WASM related bindings.
-   - `BUILD` file uses the `wasm_cc_binary` rule to build the WASM module. As
-     you can see, it is currently linking with
+   - The `BUILD` file uses the `wasm_cc_binary` rule to build the WASM module.
+     It is currently linking with
      [XNNPACK](https://github.com/jinjingforever/tflite-support/blob/master/tensorflow_lite_support/web/tflite_model_runner/cc/BUILD#L57), with WASM
      SIMD and multi-threading
      [turned on](https://github.com/jinjingforever/tflite-support/blob/master/tensorflow_lite_support/web/tflite_model_runner/cc/BUILD#L65-L66).
@@ -29,7 +29,11 @@ using bazel and emsdk.
      `build.sh` where you can see how the `bazel build` command is used and how
      to extract the output files.
    - Run `yarn start` to start the demo locally. It creates a model runner
-     instance with a MobilenetV2 model, and uses the model runner to identify an
-     image. See the
+     instance with the MobilenetV2 model, and uses the model runner to identify
+     an image. See the
      [script.js](https://github.com/jinjingforever/tflite-support/blob/master/tensorflow_lite_support/web/tflite_model_runner/demo/src/script.js) file
      for details about how things are used from the JS side.
+   - Since this build configuration is for SIMD+multi-threading, please make
+     sure Chrome has these two features
+     [turned on](https://drive.google.com/file/d/13hqGwBOTJFoqMQVUAn_tiYp-uqQN_NUq/view?usp=sharing)
+     from `chrome://flags`.
