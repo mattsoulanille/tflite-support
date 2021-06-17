@@ -26,11 +26,11 @@ using bazel and emsdk.
 4. The demo code is
    [here](https://github.com/jinjingforever/tflite-support/tree/master/tensorflow_lite_support/web/tflite_model_runner/demo). To run the demo:
    - Run `yarn && yarn build` in the demo directory. `yarn build` runs
-     `build.sh` where you can see how the `bazel build` command is used and how
-     to extract the output files.
+     [build.sh](https://github.com/jinjingforever/tflite-support/blob/master/tensorflow_lite_support/web/tflite_model_runner/demo/build.sh)
+     where you can see how the `bazel build` command is used and how to extract
+     the output files.
    - Run `yarn start` to start the demo locally. It creates a model runner
-     instance with the MobilenetV2 model, and uses the model runner to identify
-     an image. See the
+     instance with the MobilenetV2 model and classfies an image. See the
      [script.js](https://github.com/jinjingforever/tflite-support/blob/master/tensorflow_lite_support/web/tflite_model_runner/demo/src/script.js) file
      for details about how things are used from the JS side.
    - Since this build configuration is for SIMD+multi-threading, please make
