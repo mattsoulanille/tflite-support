@@ -62,7 +62,7 @@ def glog_library(namespace='google', with_gflags=1):
             # Allows src/logging.cc to determine the host name.
             '-DHAVE_SYS_UTSNAME_H',
             # For src/utilities.cc.
-            '-DHAVE_SYS_SYSCALL_H',
+            # '-DHAVE_SYS_SYSCALL_H',
             '-DHAVE_SYS_TIME_H',
             '-DHAVE_STDINT_H',
             '-DHAVE_STRING_H',
