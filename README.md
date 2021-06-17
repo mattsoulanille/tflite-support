@@ -4,9 +4,17 @@ addition of the `tflite_model_runner` related code to show how it is built
 using bazel and emsdk.
 
 1. Add emscripten toolchain to the
-   [WORKSPACE](https://github.com/jinjingforever/tflite-support/blob/master/WORKSPACE#L434-L447)file. This will provide a useful build rule `wasm_cc_binary` that can be used
-   to build WASM module from a cc_binary.
-2. Check out the cpp code
+   [WORKSPACE](https://github.com/jinjingforever/tflite-support/blob/master/WORKSPACE#L436-L449)
+   file. This will set up emsdk and provide a useful build rule `wasm_cc_binary`
+   that can be used to build WASM module from a cc_binary (see below).
+2. I also added a small
+   [patch](https://github.com/jinjingforever/tflite-support/blob/master/WORKSPACE#L169-L170)
+   for the com_google_glog library. Without it, the emscripten build will fail
+   on Mac/Linux. The glog
+   [0.5](https://github.com/google/glog/releases/tag/v0.5.0) release has a fix
+   for this issue, but it requires some TFLite code refactoring. I will talk to
+   the TFLite team about this. For now we will just use the patch.
+3. The cpp code is
    [here](https://github.com/jinjingforever/tflite-support/tree/master/tensorflow_lite_support/web/tflite_model_runner/cc).
    - `tflite_model_runner.*` implement the model runner.
    - `tflite_model_runner_wasm.cc` sets up the WASM related bindings.
@@ -15,7 +23,7 @@ using bazel and emsdk.
      [XNNPACK](https://github.com/jinjingforever/tflite-support/blob/master/tensorflow_lite_support/web/tflite_model_runner/cc/BUILD#L57), with WASM
      SIMD and multi-threading
      [turned on](https://github.com/jinjingforever/tflite-support/blob/master/tensorflow_lite_support/web/tflite_model_runner/cc/BUILD#L65-L66).
-3. Check out the demo code
+4. The demo code is
    [here](https://github.com/jinjingforever/tflite-support/tree/master/tensorflow_lite_support/web/tflite_model_runner/demo). To run the demo:
    - Run `yarn && yarn build` in the demo directory. `yarn build` runs
      `build.sh` where you can see how the `bazel build` command is used and how
