@@ -21,10 +21,11 @@ import java.nio.MappedByteBuffer;
 import java.util.Map;
 import org.checkerframework.checker.nullness.qual.NonNull;
 import org.checkerframework.checker.nullness.qual.Nullable;
-import org.tensorflow.lite.Interpreter;
+import org.tensorflow.lite.InterpreterApi;
+import org.tensorflow.lite.InterpreterApi.Options.TfLiteRuntime;
 import org.tensorflow.lite.Tensor;
 import org.tensorflow.lite.support.common.FileUtil;
-import org.tensorflow.lite.support.common.SupportPreconditions;
+import org.tensorflow.lite.support.common.internal.SupportPreconditions;
 
 /**
  * The wrapper class for a TFLite model and a TFLite interpreter.
@@ -55,11 +56,13 @@ public class Model {
   public static class Options {
     private final Device device;
     private final int numThreads;
+    private final TfLiteRuntime tfLiteRuntime;
 
     /** Builder of {@link Options}. See its doc for details. */
     public static class Builder {
       private Device device = Device.CPU;
       private int numThreads = 1;
+      private TfLiteRuntime tfLiteRuntime;
 
       public Builder setDevice(Device device) {
         this.device = device;
@@ -71,6 +74,11 @@ public class Model {
         return this;
       }
 
+      public Builder setTfLiteRuntime(TfLiteRuntime tfLiteRuntime) {
+        this.tfLiteRuntime = tfLiteRuntime;
+        return this;
+      }
+
       public Options build() {
         return new Options(this);
       }
@@ -79,11 +87,12 @@ public class Model {
     private Options(Builder builder) {
       device = builder.device;
       numThreads = builder.numThreads;
+      tfLiteRuntime = builder.tfLiteRuntime;
     }
   }
 
   /** An instance of the driver class to run model inference with Tensorflow Lite. */
-  private final Interpreter interpreter;
+  private final InterpreterApi interpreter;
 
   /** Path to tflite model file in asset folder. */
   private final String modelPath;
@@ -112,7 +121,6 @@ public class Model {
      * @param modelPath Asset path of the model (.tflite file).
      * @throws IOException if an I/O error occurs when loading the tflite model.
      */
-    @NonNull
     public Builder(@NonNull Context context, @NonNull String modelPath) throws IOException {
       this.modelPath = modelPath;
       byteModel = FileUtil.loadMappedFile(context, modelPath);
@@ -186,7 +194,7 @@ public class Model {
    */
   public static Model createModel(
       @NonNull MappedByteBuffer byteModel, @NonNull String modelPath, @NonNull Options options) {
-    Interpreter.Options interpreterOptions = new Interpreter.Options();
+    InterpreterApi.Options interpreterOptions = new InterpreterApi.Options();
     GpuDelegateProxy gpuDelegateProxy = null;
     switch (options.device) {
       case NNAPI:
@@ -203,7 +211,10 @@ public class Model {
         break;
     }
     interpreterOptions.setNumThreads(options.numThreads);
-    Interpreter interpreter = new Interpreter(byteModel, interpreterOptions);
+    if (options.tfLiteRuntime != null) {
+      interpreterOptions.setRuntime(options.tfLiteRuntime);
+    }
+    InterpreterApi interpreter = InterpreterApi.create(byteModel, interpreterOptions);
     return new Model(modelPath, byteModel, interpreter, gpuDelegateProxy);
   }
 
@@ -220,7 +231,7 @@ public class Model {
   }
 
   /**
-   * Gets the Tensor associated with the provdied input index.
+   * Gets the Tensor associated with the provided input index.
    *
    * @throws IllegalStateException if the interpreter is closed.
    */
@@ -229,7 +240,7 @@ public class Model {
   }
 
   /**
-   * Gets the Tensor associated with the provdied output index.
+   * Gets the Tensor associated with the provided output index.
    *
    * @throws IllegalStateException if the interpreter is closed.
    */
@@ -275,7 +286,7 @@ public class Model {
   private Model(
       @NonNull String modelPath,
       @NonNull MappedByteBuffer byteModel,
-      @NonNull Interpreter interpreter,
+      @NonNull InterpreterApi interpreter,
       @Nullable GpuDelegateProxy gpuDelegateProxy) {
     this.modelPath = modelPath;
     this.byteModel = byteModel;

@@ -24,8 +24,8 @@ limitations under the License.
 #include <memory>
 #include <string>
 
-#include "absl/memory/memory.h"
-#include "absl/strings/str_format.h"
+#include "absl/memory/memory.h"  // from @com_google_absl
+#include "absl/strings/str_format.h"  // from @com_google_absl
 #include "tensorflow_lite_support/cc/common.h"
 #include "tensorflow_lite_support/cc/port/statusor.h"
 #include "tensorflow_lite_support/cc/port/status_macros.h"
@@ -75,7 +75,7 @@ absl::Status ExternalFileHandler::MapExternalFile() {
       !external_file_.has_file_descriptor_meta()) {
     return CreateStatusWithPayload(
         StatusCode::kInvalidArgument,
-        "ExternalFile must specify at least one of 'file_content', file_name' "
+        "ExternalFile must specify at least one of 'file_content', 'file_name' "
         "or 'file_descriptor_meta'.",
         TfLiteSupportStatus::kInvalidArgumentError);
   }

@@ -15,8 +15,8 @@ limitations under the License.
 
 #include "tensorflow_lite_support/cc/common.h"
 
-#include "absl/strings/cord.h"
-#include "absl/strings/str_cat.h"
+#include "absl/strings/cord.h"  // from @com_google_absl
+#include "absl/strings/str_cat.h"  // from @com_google_absl
 
 namespace tflite {
 namespace support {

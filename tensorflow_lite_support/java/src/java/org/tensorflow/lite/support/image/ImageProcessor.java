@@ -25,8 +25,8 @@ import java.util.List;
 import java.util.ListIterator;
 import org.tensorflow.lite.support.common.Operator;
 import org.tensorflow.lite.support.common.SequentialProcessor;
-import org.tensorflow.lite.support.common.SupportPreconditions;
 import org.tensorflow.lite.support.common.TensorOperator;
+import org.tensorflow.lite.support.common.internal.SupportPreconditions;
 import org.tensorflow.lite.support.image.ops.Rot90Op;
 import org.tensorflow.lite.support.image.ops.TensorOperatorWrapper;
 
@@ -51,8 +51,8 @@ import org.tensorflow.lite.support.image.ops.TensorOperatorWrapper;
  * {@code ImageProcessor} instances for each thread. If multiple threads access a {@code
  * ImageProcessor} concurrently, it must be synchronized externally.
  *
- * @see ImageProcessor.Builder to build a {@link ImageProcessor} instance
- * @see ImageProcessor#process(TensorImage) to apply the processor on a {@link TensorImage}
+ * @see ImageProcessor.Builder to build a {@code ImageProcessor} instance
+ * @see ImageProcessor#process(TensorImage) to apply the processor on a {@code TensorImage}
  */
 public class ImageProcessor extends SequentialProcessor<TensorImage> {
   private ImageProcessor(Builder builder) {

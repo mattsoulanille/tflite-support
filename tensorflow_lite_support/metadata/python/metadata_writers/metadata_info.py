@@ -14,11 +14,14 @@
 # ==============================================================================
 """Helper classes for common model metadata information."""
 
+import collections
+import csv
 import os
-from typing import Optional, List, Type
+from typing import List, Optional, Type, Union
 
 from tensorflow_lite_support.metadata import metadata_schema_py_generated as _metadata_fb
 from tensorflow_lite_support.metadata import schema_py_generated as _schema_fb
+from tensorflow_lite_support.metadata.python.metadata_writers import writer_utils
 
 # Min and max values for UINT8 tensors.
 _MIN_UINT8 = 0
@@ -273,10 +276,27 @@ class ScoreCalibrationMd:
       file_path: file_path of the score calibration file [1].
       [1]:
         https://github.com/tensorflow/tflite-support/blob/5e0cdf5460788c481f5cd18aab8728ec36cf9733/tensorflow_lite_support/metadata/metadata_schema.fbs#L122
+
+    Raises:
+      ValueError: if the score_calibration file is malformed.
     """
     self._score_transformation_type = score_transformation_type
     self._default_score = default_score
     self._file_path = file_path
+
+    # Sanity check the score calibration file.
+    with open(self._file_path) as calibration_file:
+      csv_reader = csv.reader(calibration_file, delimiter=",")
+      for row in csv_reader:
+        if row and len(row) != 3 and len(row) != 4:
+          raise ValueError(
+              f"Expected empty lines or 3 or 4 parameters per line in score"
+              f" calibration file, but got {len(row)}.")
+
+        if row and float(row[0]) < 0:
+          raise ValueError(
+              f"Expected scale to be a non-negative value, but got "
+              f"{float(row[0])}.")
 
   def create_metadata(self) -> _metadata_fb.ProcessUnitT:
     """Creates the score calibration metadata based on the information.
@@ -421,11 +441,9 @@ class InputImageTensorMd(TensorMd):
       ValueError: if norm_mean and norm_std have different dimensions.
     """
     if norm_std and norm_mean and len(norm_std) != len(norm_mean):
-      # TODO(b/175843689): Python version cannot be specified in Kokoro bazel
-      # test
       raise ValueError(
-          "norm_mean and norm_std are expected to be the same dim. But got " +
-          "{} and {}".format(len(norm_mean), len(norm_std)))
+          f"norm_mean and norm_std are expected to be the same dim. But got "
+          f"{len(norm_mean)} and {len(norm_std)}")
 
     if tensor_type is _schema_fb.TensorType.UINT8:
       min_values = [_MIN_UINT8]
@@ -512,8 +530,8 @@ class InputTextTensorMd(TensorMd):
     """
     if not isinstance(self.tokenizer_md, (type(None), RegexTokenizerMd)):
       raise ValueError(
-          "The type of tokenizer_options, {}, is unsupported".format(
-              type(self.tokenizer_md)))
+          f"The type of tokenizer_options, {type(self.tokenizer_md)}, is "
+          f"unsupported")
 
     tensor_metadata = super().create_metadata()
     if self.tokenizer_md:
@@ -561,12 +579,12 @@ class InputAudioTensorMd(TensorMd):
     """
     # 0 is the default value in Flatbuffers.
     if self.sample_rate < 0:
-      raise ValueError("sample_rate should be non-negative, but got {}.".format(
-          self.sample_rate))
+      raise ValueError(
+          f"sample_rate should be non-negative, but got {self.sample_rate}.")
 
     if self.channels < 0:
-      raise ValueError("channels should be non-negative, but got {}.".format(
-          self.channels))
+      raise ValueError(
+          f"channels should be non-negative, but got {self.channels}.")
 
     tensor_metadata = super().create_metadata()
     properties = tensor_metadata.content.contentProperties
@@ -680,3 +698,120 @@ class CategoryTensorMd(TensorMd):
 
     super().__init__(
         name=name, description=description, associated_files=value_label_files)
+
+
+class BertInputTensorsMd:
+  """A container for the input tensor metadata information of Bert models."""
+
+  _IDS_NAME = "ids"
+  _IDS_DESCRIPTION = "Tokenized ids of the input text."
+  _MASK_NAME = "mask"
+  _MASK_DESCRIPTION = ("Mask with 1 for real tokens and 0 for padding "
+                       "tokens.")
+  _SEGMENT_IDS_NAME = "segment_ids"
+  _SEGMENT_IDS_DESCRIPTION = (
+      "0 for the first sequence, 1 for the second sequence if exists.")
+
+  def __init__(self,
+               model_buffer: bytearray,
+               ids_name: str,
+               mask_name: str,
+               segment_name: str,
+               ids_md: Optional[TensorMd] = None,
+               mask_md: Optional[TensorMd] = None,
+               segment_ids_md: Optional[TensorMd] = None,
+               tokenizer_md: Union[None, BertTokenizerMd,
+                                   SentencePieceTokenizerMd] = None):
+    """Initializes a BertInputTensorsMd object.
+
+    `ids_name`, `mask_name`, and `segment_name` correspond to the `Tensor.name`
+    in the TFLite schema, which help to determine the tensor order when
+    populating metadata.
+
+    Args:
+      model_buffer: valid buffer of the model file.
+      ids_name: name of the ids tensor, which represents the tokenized ids of
+        the input text.
+      mask_name: name of the mask tensor, which represents the mask with 1 for
+        real tokens and 0 for padding tokens.
+      segment_name: name of the segment ids tensor, where `0` stands for the
+        first sequence, and `1` stands for the second sequence if exists.
+      ids_md: input ids tensor informaton.
+      mask_md: input mask tensor informaton.
+      segment_ids_md: input segment tensor informaton.
+      tokenizer_md: information of the tokenizer used to process the input
+        string, if any. Supported tokenziers are: `BertTokenizer` [1] and
+          `SentencePieceTokenizer` [2]. If the tokenizer is `RegexTokenizer`
+          [3], refer to `nl_classifier.MetadataWriter`.
+        [1]:
+        https://github.com/tensorflow/tflite-support/blob/b80289c4cd1224d0e1836c7654e82f070f9eefaa/tensorflow_lite_support/metadata/metadata_schema.fbs#L436
+        [2]:
+        https://github.com/tensorflow/tflite-support/blob/b80289c4cd1224d0e1836c7654e82f070f9eefaa/tensorflow_lite_support/metadata/metadata_schema.fbs#L473
+        [3]:
+        https://github.com/tensorflow/tflite-support/blob/b80289c4cd1224d0e1836c7654e82f070f9eefaa/tensorflow_lite_support/metadata/metadata_schema.fbs#L475
+    """
+
+    self._input_names = [ids_name, mask_name, segment_name]
+
+    # Get the input tensor names in order from the model. Later, we need to
+    # order the input metadata according to this tensor order.
+    self._ordered_input_names = writer_utils.get_input_tensor_names(
+        model_buffer)
+
+    # Verify that self._ordered_input_names (read from the model) and
+    # self._input_name (collected from users) are aligned.
+    if collections.Counter(self._ordered_input_names) != collections.Counter(
+        self._input_names):
+      raise ValueError(
+          f"The input tensor names ({self._ordered_input_names}) do not match "
+          f"the tensor names read from the model ({self._input_names}).")
+
+    if ids_md is None:
+      ids_md = TensorMd(name=self._IDS_NAME, description=self._IDS_DESCRIPTION)
+
+    if mask_md is None:
+      mask_md = TensorMd(
+          name=self._MASK_NAME, description=self._MASK_DESCRIPTION)
+
+    if segment_ids_md is None:
+      segment_ids_md = TensorMd(
+          name=self._SEGMENT_IDS_NAME,
+          description=self._SEGMENT_IDS_DESCRIPTION)
+
+    # The order of self._input_md matches the order of self._input_names.
+    self._input_md = [ids_md, mask_md, segment_ids_md]
+
+    if not isinstance(tokenizer_md,
+                      (type(None), BertTokenizerMd, SentencePieceTokenizerMd)):
+      raise ValueError(
+          f"The type of tokenizer_options, {type(tokenizer_md)}, is unsupported"
+      )
+
+    self._tokenizer_md = tokenizer_md
+
+  def create_input_tesnor_metadata(self) -> List[_metadata_fb.TensorMetadataT]:
+    """Creates the input metadata for the three input tesnors."""
+    # The order of the three input tensors may vary with each model conversion.
+    # We need to order the input metadata according to the tensor order in the
+    # model.
+    ordered_metadata = []
+    name_md_dict = dict(zip(self._input_names, self._input_md))
+    for name in self._ordered_input_names:
+      ordered_metadata.append(name_md_dict[name].create_metadata())
+    return ordered_metadata
+
+  def create_input_process_unit_metadata(
+      self) -> List[_metadata_fb.ProcessUnitT]:
+    """Creates the input process unit metadata."""
+    if self._tokenizer_md:
+      return [self._tokenizer_md.create_metadata()]
+    else:
+      return []
+
+  def get_tokenizer_associated_files(self) -> List[str]:
+    """Gets the associated files that are packed in the tokenizer."""
+    if self._tokenizer_md:
+      return writer_utils.get_tokenizer_associated_files(
+          self._tokenizer_md.create_metadata().options)
+    else:
+      return []

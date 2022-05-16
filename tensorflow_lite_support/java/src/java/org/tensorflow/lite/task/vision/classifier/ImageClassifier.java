@@ -18,6 +18,7 @@ package org.tensorflow.lite.task.vision.classifier;
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.ParcelFileDescriptor;
+import com.google.android.odml.image.MlImage;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -25,11 +26,13 @@ import java.nio.MappedByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.tensorflow.lite.annotations.UsedByReflection;
+import org.tensorflow.lite.support.image.MlImageAdapter;
 import org.tensorflow.lite.support.image.TensorImage;
+import org.tensorflow.lite.task.core.BaseOptions;
 import org.tensorflow.lite.task.core.TaskJniUtils;
 import org.tensorflow.lite.task.core.TaskJniUtils.EmptyHandleProvider;
 import org.tensorflow.lite.task.core.TaskJniUtils.FdAndOptionsHandleProvider;
+import org.tensorflow.lite.task.core.annotations.UsedByReflection;
 import org.tensorflow.lite.task.core.vision.ImageProcessingOptions;
 import org.tensorflow.lite.task.vision.core.BaseVisionTaskApi;
 import org.tensorflow.lite.task.vision.core.BaseVisionTaskApi.InferenceProvider;
@@ -78,8 +81,9 @@ public final class ImageClassifier extends BaseVisionTaskApi {
    *
    * @param modelPath path of the classification model with metadata in the assets
    * @throws IOException if an I/O error occurs when loading the tflite model
-   * @throws AssertionError if error occurs when creating {@link ImageClassifier} from the native
-   *     code
+   * @throws IllegalArgumentException if an argument is invalid
+   * @throws IllegalStateException if there is an internal error
+   * @throws RuntimeException if there is an otherwise unspecified error
    */
   public static ImageClassifier createFromFile(Context context, String modelPath)
       throws IOException {
@@ -91,8 +95,9 @@ public final class ImageClassifier extends BaseVisionTaskApi {
    *
    * @param modelFile the classification model {@link File} instance
    * @throws IOException if an I/O error occurs when loading the tflite model
-   * @throws AssertionError if error occurs when creating {@link ImageClassifier} from the native
-   *     code
+   * @throws IllegalArgumentException if an argument is invalid
+   * @throws IllegalStateException if there is an internal error
+   * @throws RuntimeException if there is an otherwise unspecified error
    */
   public static ImageClassifier createFromFile(File modelFile) throws IOException {
     return createFromFileAndOptions(modelFile, ImageClassifierOptions.builder().build());
@@ -104,10 +109,10 @@ public final class ImageClassifier extends BaseVisionTaskApi {
    *
    * @param modelBuffer a direct {@link ByteBuffer} or a {@link MappedByteBuffer} of the
    *     classification model
-   * @throws AssertionError if error occurs when creating {@link ImageClassifier} from the native
-   *     code
    * @throws IllegalArgumentException if the model buffer is not a direct {@link ByteBuffer} or a
    *     {@link MappedByteBuffer}
+   * @throws IllegalStateException if there is an internal error
+   * @throws RuntimeException if there is an otherwise unspecified error
    */
   public static ImageClassifier createFromBuffer(final ByteBuffer modelBuffer) {
     return createFromBufferAndOptions(modelBuffer, ImageClassifierOptions.builder().build());
@@ -118,8 +123,9 @@ public final class ImageClassifier extends BaseVisionTaskApi {
    *
    * @param modelPath path of the classification model with metadata in the assets
    * @throws IOException if an I/O error occurs when loading the tflite model
-   * @throws AssertionError if error occurs when creating {@link ImageClassifier} from the native
-   *     code
+   * @throws IllegalArgumentException if an argument is invalid
+   * @throws IllegalStateException if there is an internal error
+   * @throws RuntimeException if there is an otherwise unspecified error
    */
   public static ImageClassifier createFromFileAndOptions(
       Context context, String modelPath, ImageClassifierOptions options) throws IOException {
@@ -134,7 +140,12 @@ public final class ImageClassifier extends BaseVisionTaskApi {
                   long fileDescriptorOffset,
                   ImageClassifierOptions options) {
                 return initJniWithModelFdAndOptions(
-                    fileDescriptor, fileDescriptorLength, fileDescriptorOffset, options);
+                    fileDescriptor,
+                    fileDescriptorLength,
+                    fileDescriptorOffset,
+                    options,
+                    TaskJniUtils.createProtoBaseOptionsHandleWithLegacyNumThreads(
+                        options.getBaseOptions(), options.getNumThreads()));
               }
             },
             IMAGE_CLASSIFIER_NATIVE_LIB,
@@ -147,8 +158,9 @@ public final class ImageClassifier extends BaseVisionTaskApi {
    *
    * @param modelFile the classification model {@link File} instance
    * @throws IOException if an I/O error occurs when loading the tflite model
-   * @throws AssertionError if error occurs when creating {@link ImageClassifier} from the native
-   *     code
+   * @throws IllegalArgumentException if an argument is invalid
+   * @throws IllegalStateException if there is an internal error
+   * @throws RuntimeException if there is an otherwise unspecified error
    */
   public static ImageClassifier createFromFileAndOptions(
       File modelFile, final ImageClassifierOptions options) throws IOException {
@@ -163,7 +175,9 @@ public final class ImageClassifier extends BaseVisionTaskApi {
                       descriptor.getFd(),
                       /*fileDescriptorLength=*/ OPTIONAL_FD_LENGTH,
                       /*fileDescriptorOffset=*/ OPTIONAL_FD_OFFSET,
-                      options);
+                      options,
+                      TaskJniUtils.createProtoBaseOptionsHandleWithLegacyNumThreads(
+                          options.getBaseOptions(), options.getNumThreads()));
                 }
               },
               IMAGE_CLASSIFIER_NATIVE_LIB));
@@ -176,10 +190,10 @@ public final class ImageClassifier extends BaseVisionTaskApi {
    *
    * @param modelBuffer a direct {@link ByteBuffer} or a {@link MappedByteBuffer} of the
    *     classification model
-   * @throws AssertionError if error occurs when creating {@link ImageClassifier} from the native
-   *     code
    * @throws IllegalArgumentException if the model buffer is not a direct {@link ByteBuffer} or a
    *     {@link MappedByteBuffer}
+   * @throws IllegalStateException if there is an internal error
+   * @throws RuntimeException if there is an otherwise unspecified error
    */
   public static ImageClassifier createFromBufferAndOptions(
       final ByteBuffer modelBuffer, final ImageClassifierOptions options) {
@@ -192,7 +206,11 @@ public final class ImageClassifier extends BaseVisionTaskApi {
             new EmptyHandleProvider() {
               @Override
               public long createHandle() {
-                return initJniWithByteBuffer(modelBuffer, options);
+                return initJniWithByteBuffer(
+                    modelBuffer,
+                    options,
+                    TaskJniUtils.createProtoBaseOptionsHandleWithLegacyNumThreads(
+                        options.getBaseOptions(), options.getNumThreads()));
               }
             },
             IMAGE_CLASSIFIER_NATIVE_LIB));
@@ -216,6 +234,7 @@ public final class ImageClassifier extends BaseVisionTaskApi {
     // 1. java.util.Optional require Java 8 while we need to support Java 7.
     // 2. The Guava library (com.google.common.base.Optional) is avoided in this project. See the
     // comments for labelAllowList.
+    private final BaseOptions baseOptions;
     private final String displayNamesLocale;
     private final int maxResults;
     private final float scoreThreshold;
@@ -235,6 +254,7 @@ public final class ImageClassifier extends BaseVisionTaskApi {
 
     /** A builder that helps to configure an instance of ImageClassifierOptions. */
     public static class Builder {
+      private BaseOptions baseOptions = BaseOptions.builder().build();
       private String displayNamesLocale = "en";
       private int maxResults = -1;
       private float scoreThreshold;
@@ -244,6 +264,12 @@ public final class ImageClassifier extends BaseVisionTaskApi {
       private int numThreads = -1;
 
       Builder() {}
+
+      /** Sets the general options to configure Task APIs, such as accelerators. */
+      public Builder setBaseOptions(BaseOptions baseOptions) {
+        this.baseOptions = baseOptions;
+        return this;
+      }
 
       /**
        * Sets the locale to use for display names specified through the TFLite Model Metadata, if
@@ -314,7 +340,11 @@ public final class ImageClassifier extends BaseVisionTaskApi {
        *
        * <p>numThreads should be greater than 0 or equal to -1. Setting numThreads to -1 has the
        * effect to let TFLite runtime set the value.
+       *
+       * @deprecated use {@link BaseOptions} to configure number of threads instead. This method
+       *     will override the number of threads configured from {@link BaseOptions}.
        */
+      @Deprecated
       public Builder setNumThreads(int numThreads) {
         this.numThreads = numThreads;
         return this;
@@ -360,6 +390,10 @@ public final class ImageClassifier extends BaseVisionTaskApi {
       return numThreads;
     }
 
+    public BaseOptions getBaseOptions() {
+      return baseOptions;
+    }
+
     ImageClassifierOptions(Builder builder) {
       displayNamesLocale = builder.displayNamesLocale;
       maxResults = builder.maxResults;
@@ -368,11 +402,12 @@ public final class ImageClassifier extends BaseVisionTaskApi {
       labelAllowList = builder.labelAllowList;
       labelDenyList = builder.labelDenyList;
       numThreads = builder.numThreads;
+      baseOptions = builder.baseOptions;
     }
   }
 
   /**
-   * Performs actual classification on the provided image.
+   * Performs actual classification on the provided {@link TensorImage}.
    *
    * <p>{@link ImageClassifier} supports the following {@link TensorImage} color space types:
    *
@@ -385,7 +420,6 @@ public final class ImageClassifier extends BaseVisionTaskApi {
    * </ul>
    *
    * @param image a UINT8 {@link TensorImage} object that represents an RGB or YUV image
-   * @throws AssertionError if error occurs when classifying the image from the native code
    * @throws IllegalArgumentException if the color space type of image is unsupported
    */
   public List<Classifications> classify(TensorImage image) {
@@ -393,7 +427,8 @@ public final class ImageClassifier extends BaseVisionTaskApi {
   }
 
   /**
-   * Performs actual classification on the provided image with {@link ImageProcessingOptions}.
+   * Performs actual classification on the provided {@link TensorImage} with {@link
+   * ImageProcessingOptions}.
    *
    * <p>{@link ImageClassifier} supports the following options:
    *
@@ -415,7 +450,6 @@ public final class ImageClassifier extends BaseVisionTaskApi {
    * </ul>
    *
    * @param image a UINT8 {@link TensorImage} object that represents an RGB or YUV image
-   * @throws AssertionError if error occurs when classifying the image from the native code
    * @throws IllegalArgumentException if the color space type of image is unsupported
    */
   public List<Classifications> classify(TensorImage image, ImageProcessingOptions options) {
@@ -429,6 +463,42 @@ public final class ImageClassifier extends BaseVisionTaskApi {
         },
         image,
         options);
+  }
+
+  /**
+   * Performs actual classification on the provided {@code MlImage}.
+   *
+   * @param image an {@code MlImage} object that represents an image
+   * @throws IllegalArgumentException if the storage type or format of the image is unsupported
+   */
+  public List<Classifications> classify(MlImage image) {
+    return classify(image, ImageProcessingOptions.builder().build());
+  }
+
+  /**
+   * Performs actual classification on the provided {@code MlImage} with {@link
+   * ImageProcessingOptions}.
+   *
+   * <p>{@link ImageClassifier} supports the following options:
+   *
+   * <ul>
+   *   <li>Region of interest (ROI) (through {@link ImageProcessingOptions.Builder#setRoi}). It
+   *       defaults to the entire image.
+   *   <li>image rotation (through {@link ImageProcessingOptions.Builder#setOrientation}). It
+   *       defaults to {@link ImageProcessingOptions.Orientation#TOP_LEFT}. {@link
+   *       MlImage#getRotation()} is not effective.
+   * </ul>
+   *
+   * @param image a {@code MlImage} object that represents an image
+   * @param options configures options including ROI and rotation
+   * @throws IllegalArgumentException if the storage type or format of the image is unsupported
+   */
+  public List<Classifications> classify(MlImage image, ImageProcessingOptions options) {
+    image.getInternal().acquire();
+    TensorImage tensorImage = MlImageAdapter.createTensorImageFrom(image);
+    List<Classifications> result = classify(tensorImage, options);
+    image.close();
+    return result;
   }
 
   private List<Classifications> classify(
@@ -447,10 +517,11 @@ public final class ImageClassifier extends BaseVisionTaskApi {
       int fileDescriptor,
       long fileDescriptorLength,
       long fileDescriptorOffset,
-      ImageClassifierOptions options);
+      ImageClassifierOptions options,
+      long baseOptionsHandle);
 
   private static native long initJniWithByteBuffer(
-      ByteBuffer modelBuffer, ImageClassifierOptions options);
+      ByteBuffer modelBuffer, ImageClassifierOptions options, long baseOptionsHandle);
 
   /**
    * The native method to classify an image with the ROI and orientation.

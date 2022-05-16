@@ -16,7 +16,7 @@ limitations under the License.
 package org.tensorflow.lite.support.audio;
 
 import static java.lang.System.arraycopy;
-import static org.tensorflow.lite.support.common.SupportPreconditions.checkArgument;
+import static org.tensorflow.lite.support.common.internal.SupportPreconditions.checkArgument;
 
 import android.media.AudioFormat;
 import android.media.AudioRecord;
@@ -96,7 +96,7 @@ public class TensorAudio {
   public abstract static class TensorAudioFormat {
     private static final int DEFAULT_CHANNELS = 1;
 
-    /** Creates a {@link TensorAudioFormat} instance from Android AudioForamt class. */
+    /** Creates a {@link TensorAudioFormat} instance from Android AudioFormat class. */
     @RequiresApi(Build.VERSION_CODES.M)
     public static TensorAudioFormat create(AudioFormat format) {
       return TensorAudioFormat.builder()
@@ -189,9 +189,9 @@ public class TensorAudio {
             "Index out of range. offset (%d) + size (%d) should <= newData.length (%d)",
             offsetInShort, sizeInShort, src.length));
     float[] floatData = new float[sizeInShort];
-    for (int i = offsetInShort; i < sizeInShort; i++) {
+    for (int i = 0; i < sizeInShort; i++) {
       // Convert the data to PCM Float encoding i.e. values between -1 and 1
-      floatData[i] = src[i] / Short.MAX_VALUE;
+      floatData[i] = src[i + offsetInShort] * 1.f / Short.MAX_VALUE;
     }
     load(floatData);
   }
@@ -202,7 +202,7 @@ public class TensorAudio {
    *
    * @param record an instance of {@link android.media.AudioRecord}
    * @return number of captured audio values whose size is {@code channelCount * sampleCount}. If
-   *     there was no new data in the AudioRecord or an error occured, this method will return 0.
+   *     there was no new data in the AudioRecord or an error occurred, this method will return 0.
    * @throws IllegalArgumentException for unsupported audio encoding format
    * @throws IllegalStateException if reading from AudioRecord failed
    */
@@ -287,7 +287,7 @@ public class TensorAudio {
 
     /**
      * Loads the entire float array to the ring buffer. If the float array is longer than ring
-     * buffer's capacity, samples with lower indicies in the array will be ignored.
+     * buffer's capacity, samples with lower indices in the array will be ignored.
      */
     public void load(float[] newData) {
       load(newData, 0, newData.length);
@@ -295,7 +295,7 @@ public class TensorAudio {
 
     /**
      * Loads a slice of the float array to the ring buffer. If the float array is longer than ring
-     * buffer's capacity, samples with lower indicies in the array will be ignored.
+     * buffer's capacity, samples with lower indices in the array will be ignored.
      */
     public void load(float[] newData, int offset, int size) {
       checkArgument(
@@ -305,7 +305,7 @@ public class TensorAudio {
               offset, size, newData.length));
       // If buffer can't hold all the data, only keep the most recent data of size buffer.length
       if (size > buffer.length) {
-        offset = size - buffer.length;
+        offset += (size - buffer.length);
         size = buffer.length;
       }
       if (nextIndex + size < buffer.length) {

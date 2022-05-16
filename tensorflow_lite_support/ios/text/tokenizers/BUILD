@@ -50,7 +50,6 @@ swift_library(
     tags = TFL_DEFAULT_TAGS,
     deps = [
         ":TFLBertTokenizer",
-        "//third_party/swift/xctest",
     ],
 )
 
@@ -73,6 +72,7 @@ objc_library(
         "Sources/TFLSentencepieceTokenizer.h",
         "Sources/TFLTokenizer.h",
     ],
+    features = ["-layering_check"],
     module_name = "TFLSentencepieceTokenizer",
     deps = [
         ":TFLTokenizerUtil",
@@ -91,7 +91,6 @@ swift_library(
     tags = TFL_DEFAULT_TAGS,
     deps = [
         ":TFLSentencepieceTokenizer",
-        "//third_party/swift/xctest",
     ],
 )
 

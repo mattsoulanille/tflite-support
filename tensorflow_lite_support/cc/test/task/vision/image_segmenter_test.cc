@@ -17,9 +17,9 @@ limitations under the License.
 
 #include <memory>
 
-#include "absl/flags/flag.h"
-#include "absl/status/status.h"
-#include "absl/strings/cord.h"
+#include "absl/flags/flag.h"  // from @com_google_absl
+#include "absl/status/status.h"  // from @com_google_absl
+#include "absl/strings/cord.h"  // from @com_google_absl
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/core/shims/cc/shims_test_util.h"
 #include "tensorflow/lite/kernels/builtin_op_kernels.h"
@@ -37,8 +37,9 @@ limitations under the License.
 #include "tensorflow_lite_support/cc/task/vision/proto/segmentations_proto_inc.h"
 #include "tensorflow_lite_support/cc/task/vision/utils/frame_buffer_common_utils.h"
 #include "tensorflow_lite_support/cc/task/vision/utils/frame_buffer_utils.h"
+#include "tensorflow_lite_support/cc/task/vision/utils/image_utils.h"
+#include "tensorflow_lite_support/cc/test/message_matchers.h"
 #include "tensorflow_lite_support/cc/test/test_utils.h"
-#include "tensorflow_lite_support/examples/task/vision/desktop/utils/image_utils.h"
 
 namespace tflite {
 namespace task {
@@ -47,6 +48,7 @@ namespace {
 
 using ::testing::HasSubstr;
 using ::testing::Optional;
+using ::tflite::support::EqualsProto;
 using ::tflite::support::kTfLiteSupportPayload;
 using ::tflite::support::StatusOr;
 using ::tflite::support::TfLiteSupportStatus;
@@ -56,7 +58,8 @@ using ::tflite::task::core::TaskAPIFactory;
 using ::tflite::task::core::TfLiteEngine;
 
 constexpr char kTestDataDirectory[] =
-    "tensorflow_lite_support/cc/test/testdata/task/vision/";
+    "/tensorflow_lite_support/cc/test/testdata/task/"
+    "vision/";
 constexpr char kDeepLabV3[] = "deeplabv3.tflite";
 
 // All results returned by DeepLabV3 are expected to contain these in addition
@@ -98,6 +101,18 @@ constexpr int kGoldenMaskMagnificationFactor = 10;
 StatusOr<ImageData> LoadImage(std::string image_name) {
   return DecodeImageFromFile(JoinPath("./" /*test src dir*/,
                                       kTestDataDirectory, image_name));
+}
+
+// Checks that the two provided `Segmentation` protos are equal.
+// If the proto definition changes, please also change this function.
+void ExpectApproximatelyEqual(const Segmentation& actual,
+                              const Segmentation& expected) {
+  EXPECT_EQ(actual.height(), expected.height());
+  EXPECT_EQ(actual.width(), expected.width());
+  for (int i = 0; i < actual.colored_labels_size(); i++) {
+    EXPECT_THAT(actual.colored_labels(i),
+                EqualsProto(expected.colored_labels(i)));
+  }
 }
 
 class DeepLabOpResolver : public ::tflite::MutableOpResolver {
@@ -242,6 +257,325 @@ TEST_P(NumThreadsTest, FailsWithInvalidNumberOfThreads) {
   EXPECT_THAT(image_segmenter_or.status().GetPayload(kTfLiteSupportPayload),
               Optional(absl::Cord(
                   absl::StrCat(TfLiteSupportStatus::kInvalidArgumentError))));
+}
+
+// Confidence masks tested in PostProcess unit tests below.
+TEST(SegmentTest, SucceedsWithCategoryMask) {
+  // Load input and build frame buffer.
+  SUPPORT_ASSERT_OK_AND_ASSIGN(ImageData rgb_image,
+                       LoadImage("segmentation_input_rotation0.jpg"));
+  std::unique_ptr<FrameBuffer> frame_buffer = CreateFromRgbRawBuffer(
+      rgb_image.pixel_data,
+      FrameBuffer::Dimension{rgb_image.width, rgb_image.height});
+  // Load golden mask output.
+  SUPPORT_ASSERT_OK_AND_ASSIGN(ImageData golden_mask,
+                       LoadImage("segmentation_golden_rotation0.png"));
+
+  ImageSegmenterOptions options;
+  options.mutable_model_file_with_metadata()->set_file_name(JoinPath(
+      "./" /*test src dir*/, kTestDataDirectory, kDeepLabV3));
+  SUPPORT_ASSERT_OK_AND_ASSIGN(std::unique_ptr<ImageSegmenter> image_segmenter,
+                       ImageSegmenter::CreateFromOptions(options));
+  SUPPORT_ASSERT_OK_AND_ASSIGN(const SegmentationResult result,
+                       image_segmenter->Segment(*frame_buffer));
+
+  EXPECT_EQ(result.segmentation_size(), 1);
+  const Segmentation& segmentation = result.segmentation(0);
+  ExpectApproximatelyEqual(
+      segmentation, ParseTextProtoOrDie<Segmentation>(kDeepLabV3PartialResult));
+  EXPECT_TRUE(segmentation.has_category_mask());
+  const uint8* mask =
+      reinterpret_cast<const uint8*>(segmentation.category_mask().data());
+
+  int inconsistent_pixels = 0;
+  int num_pixels = golden_mask.height * golden_mask.width;
+  for (int i = 0; i < num_pixels; ++i) {
+    inconsistent_pixels +=
+        (mask[i] * kGoldenMaskMagnificationFactor != golden_mask.pixel_data[i]);
+  }
+  EXPECT_LT(static_cast<float>(inconsistent_pixels) / num_pixels,
+            kGoldenMaskTolerance);
+  ImageDataFree(&rgb_image);
+  ImageDataFree(&golden_mask);
+}
+
+TEST(SegmentTest, SucceedsWithOrientation) {
+  // Load input and build frame buffer with kRightBottom orientation.
+  SUPPORT_ASSERT_OK_AND_ASSIGN(ImageData rgb_image,
+                       LoadImage("segmentation_input_rotation90_flop.jpg"));
+  std::unique_ptr<FrameBuffer> frame_buffer = CreateFromRgbRawBuffer(
+      rgb_image.pixel_data,
+      FrameBuffer::Dimension{rgb_image.width, rgb_image.height},
+      FrameBuffer::Orientation::kRightBottom);
+  // Load golden mask output.
+  SUPPORT_ASSERT_OK_AND_ASSIGN(ImageData golden_mask,
+                       LoadImage("segmentation_golden_rotation90_flop.png"));
+
+  ImageSegmenterOptions options;
+  options.mutable_model_file_with_metadata()->set_file_name(JoinPath(
+      "./" /*test src dir*/, kTestDataDirectory, kDeepLabV3));
+  SUPPORT_ASSERT_OK_AND_ASSIGN(std::unique_ptr<ImageSegmenter> image_segmenter,
+                       ImageSegmenter::CreateFromOptions(options));
+  SUPPORT_ASSERT_OK_AND_ASSIGN(const SegmentationResult result,
+                       image_segmenter->Segment(*frame_buffer));
+
+  EXPECT_EQ(result.segmentation_size(), 1);
+  const Segmentation& segmentation = result.segmentation(0);
+  ExpectApproximatelyEqual(
+      segmentation, ParseTextProtoOrDie<Segmentation>(kDeepLabV3PartialResult));
+  EXPECT_TRUE(segmentation.has_category_mask());
+  const uint8* mask =
+      reinterpret_cast<const uint8*>(segmentation.category_mask().data());
+  int inconsistent_pixels = 0;
+  int num_pixels = golden_mask.height * golden_mask.width;
+  for (int i = 0; i < num_pixels; ++i) {
+    inconsistent_pixels +=
+        (mask[i] * kGoldenMaskMagnificationFactor != golden_mask.pixel_data[i]);
+  }
+  EXPECT_LT(static_cast<float>(inconsistent_pixels) / num_pixels,
+            kGoldenMaskTolerance);
+  ImageDataFree(&rgb_image);
+  ImageDataFree(&golden_mask);
+}
+
+TEST(SegmentTest, SucceedsWithBaseOptions) {
+  // Load input and build frame buffer.
+  SUPPORT_ASSERT_OK_AND_ASSIGN(ImageData rgb_image,
+                       LoadImage("segmentation_input_rotation0.jpg"));
+  std::unique_ptr<FrameBuffer> frame_buffer = CreateFromRgbRawBuffer(
+      rgb_image.pixel_data,
+      FrameBuffer::Dimension{rgb_image.width, rgb_image.height});
+  // Load golden mask output.
+  SUPPORT_ASSERT_OK_AND_ASSIGN(ImageData golden_mask,
+                       LoadImage("segmentation_golden_rotation0.png"));
+
+  ImageSegmenterOptions options;
+  options.mutable_base_options()->mutable_model_file()->set_file_name(JoinPath(
+      "./" /*test src dir*/, kTestDataDirectory, kDeepLabV3));
+  SUPPORT_ASSERT_OK_AND_ASSIGN(std::unique_ptr<ImageSegmenter> image_segmenter,
+                       ImageSegmenter::CreateFromOptions(options));
+  SUPPORT_ASSERT_OK_AND_ASSIGN(const SegmentationResult result,
+                       image_segmenter->Segment(*frame_buffer));
+
+  EXPECT_EQ(result.segmentation_size(), 1);
+  const Segmentation& segmentation = result.segmentation(0);
+  ExpectApproximatelyEqual(
+      segmentation, ParseTextProtoOrDie<Segmentation>(kDeepLabV3PartialResult));
+  EXPECT_TRUE(segmentation.has_category_mask());
+  const uint8* mask =
+      reinterpret_cast<const uint8*>(segmentation.category_mask().data());
+
+  int inconsistent_pixels = 0;
+  int num_pixels = golden_mask.height * golden_mask.width;
+  for (int i = 0; i < num_pixels; ++i) {
+    inconsistent_pixels +=
+        (mask[i] * kGoldenMaskMagnificationFactor != golden_mask.pixel_data[i]);
+  }
+  EXPECT_LT(static_cast<float>(inconsistent_pixels) / num_pixels,
+            kGoldenMaskTolerance);
+  ImageDataFree(&rgb_image);
+  ImageDataFree(&golden_mask);
+}
+
+class PostprocessTest : public tflite_shims::testing::Test {
+ public:
+  class TestImageSegmenter : public ImageSegmenter {
+   public:
+    using ImageSegmenter::ImageSegmenter;
+    using ImageSegmenter::Postprocess;
+
+    static StatusOr<std::unique_ptr<TestImageSegmenter>> CreateFromOptions(
+        const ImageSegmenterOptions& options) {
+      RETURN_IF_ERROR(SanityCheckOptions(options));
+
+      auto options_copy = absl::make_unique<ImageSegmenterOptions>(options);
+
+      ASSIGN_OR_RETURN(
+          auto image_segmenter,
+          TaskAPIFactory::CreateFromExternalFileProto<TestImageSegmenter>(
+              &options_copy->model_file_with_metadata()));
+
+      RETURN_IF_ERROR(image_segmenter->Init(std::move(options_copy)));
+
+      return image_segmenter;
+    }
+
+    TfLiteTensor* GetOutputTensor() {
+      if (TfLiteEngine::OutputCount(GetTfLiteEngine()->interpreter()) != 1) {
+        return nullptr;
+      }
+      return TfLiteEngine::GetOutput(GetTfLiteEngine()->interpreter(), 0);
+    }
+  };
+
+ protected:
+  void SetUp() override { tflite_shims::testing::Test::SetUp(); }
+  void SetUp(const ImageSegmenterOptions& options) {
+    StatusOr<std::unique_ptr<TestImageSegmenter>> test_image_segmenter_or =
+        TestImageSegmenter::CreateFromOptions(options);
+
+    init_status_ = test_image_segmenter_or.status();
+
+    if (init_status_.ok()) {
+      test_image_segmenter_ = std::move(test_image_segmenter_or).value();
+    }
+  }
+
+  StatusOr<const TfLiteTensor*> FillAndGetOutputTensor() {
+    TfLiteTensor* output_tensor = test_image_segmenter_->GetOutputTensor();
+
+    // Fill top-left corner and pad all other pixels with zeros.
+    std::vector<float> confidence_scores = confidence_scores_;
+    confidence_scores.resize(/*width*/ 257 *
+                             /*height*/ 257 *
+                             /*classes*/ 21);
+    RETURN_IF_ERROR(PopulateTensor(confidence_scores, output_tensor));
+
+    return output_tensor;
+  }
+
+  std::unique_ptr<TestImageSegmenter> test_image_segmenter_;
+  absl::Status init_status_;
+  std::vector<float> confidence_scores_ = {/*background=*/0.01,
+                                           /*aeroplane=*/0.01,
+                                           /*bicycle=*/0.01,
+                                           /*bird=*/0.01,
+                                           /*boat=*/0.01,
+                                           /*bottle=*/0.01,
+                                           /*bus=*/0.21,
+                                           /*car=*/0.60,  // highest (index=7)
+                                           /*cat=*/0.01,
+                                           /*chair=*/0.01,
+                                           /*cow=*/0.01,
+                                           /*dining table=*/0.01,
+                                           /*dog=*/0.01,
+                                           /*horse=*/0.01,
+                                           /*motorbike=*/0.01,
+                                           /*person=*/0.01,
+                                           /*potted plant=*/0.01,
+                                           /*sheep=*/0.01,
+                                           /*sofa=*/0.01,
+                                           /*train=*/0.01,
+                                           /*tv=*/0.01};
+};
+
+TEST_F(PostprocessTest, SucceedsWithCategoryMask) {
+  ImageSegmenterOptions options;
+  options.mutable_model_file_with_metadata()->set_file_name(JoinPath(
+      "./" /*test src dir*/, kTestDataDirectory, kDeepLabV3));
+  std::unique_ptr<FrameBuffer> frame_buffer =
+      CreateFromRgbaRawBuffer(/*input=*/nullptr, {});
+
+  SetUp(options);
+  ASSERT_TRUE(test_image_segmenter_ != nullptr) << init_status_;
+  SUPPORT_ASSERT_OK_AND_ASSIGN(const TfLiteTensor* output_tensor,
+                       FillAndGetOutputTensor());
+  SUPPORT_ASSERT_OK_AND_ASSIGN(SegmentationResult result,
+                       test_image_segmenter_->Postprocess(
+                           {output_tensor}, *frame_buffer, /*roi=*/{}));
+
+  EXPECT_EQ(result.segmentation_size(), 1);
+  const Segmentation& segmentation = result.segmentation(0);
+  ExpectApproximatelyEqual(
+      segmentation, ParseTextProtoOrDie<Segmentation>(kDeepLabV3PartialResult));
+  EXPECT_TRUE(segmentation.has_category_mask());
+  // Check top-left corner has expected class.
+  const uint8* category_mask =
+      reinterpret_cast<const uint8*>(segmentation.category_mask().data());
+  EXPECT_EQ(category_mask[0], /*car*/ 7);
+}
+
+TEST_F(PostprocessTest, SucceedsWithCategoryMaskAndOrientation) {
+  ImageSegmenterOptions options;
+  options.mutable_model_file_with_metadata()->set_file_name(JoinPath(
+      "./" /*test src dir*/, kTestDataDirectory, kDeepLabV3));
+  // Frame buffer with kRightBottom orientation.
+  std::unique_ptr<FrameBuffer> frame_buffer = CreateFromRgbaRawBuffer(
+      /*input=*/nullptr, {}, FrameBuffer::Orientation::kRightBottom);
+
+  SetUp(options);
+  ASSERT_TRUE(test_image_segmenter_ != nullptr) << init_status_;
+  SUPPORT_ASSERT_OK_AND_ASSIGN(const TfLiteTensor* output_tensor,
+                       FillAndGetOutputTensor());
+  SUPPORT_ASSERT_OK_AND_ASSIGN(SegmentationResult result,
+                       test_image_segmenter_->Postprocess(
+                           {output_tensor}, *frame_buffer, /*roi=*/{}));
+
+  EXPECT_EQ(result.segmentation_size(), 1);
+  const Segmentation& segmentation = result.segmentation(0);
+  ExpectApproximatelyEqual(
+      segmentation, ParseTextProtoOrDie<Segmentation>(kDeepLabV3PartialResult));
+  EXPECT_TRUE(segmentation.has_category_mask());
+  // Check bottom-right corner has expected class.
+  const uint8* category_mask =
+      reinterpret_cast<const uint8*>(segmentation.category_mask().data());
+  EXPECT_EQ(category_mask[/*width*/ 257 * /*height*/ 257 - 1], /*car*/ 7);
+}
+
+TEST_F(PostprocessTest, SucceedsWithConfidenceMask) {
+  ImageSegmenterOptions options;
+  options.set_output_type(ImageSegmenterOptions::CONFIDENCE_MASK);
+  options.mutable_model_file_with_metadata()->set_file_name(JoinPath(
+      "./" /*test src dir*/, kTestDataDirectory, kDeepLabV3));
+  std::unique_ptr<FrameBuffer> frame_buffer =
+      CreateFromRgbaRawBuffer(/*input=*/nullptr, {});
+
+  SetUp(options);
+  ASSERT_TRUE(test_image_segmenter_ != nullptr) << init_status_;
+  SUPPORT_ASSERT_OK_AND_ASSIGN(const TfLiteTensor* output_tensor,
+                       FillAndGetOutputTensor());
+  SUPPORT_ASSERT_OK_AND_ASSIGN(SegmentationResult result,
+                       test_image_segmenter_->Postprocess(
+                           {output_tensor}, *frame_buffer, /*roi=*/{}));
+
+  EXPECT_EQ(result.segmentation_size(), 1);
+  const Segmentation& segmentation = result.segmentation(0);
+  ExpectApproximatelyEqual(
+      segmentation, ParseTextProtoOrDie<Segmentation>(kDeepLabV3PartialResult));
+  EXPECT_TRUE(segmentation.has_confidence_masks());
+  const Segmentation::ConfidenceMasks confidence_masks =
+      segmentation.confidence_masks();
+  EXPECT_EQ(confidence_masks.confidence_mask_size(), confidence_scores_.size());
+  // Check top-left corner has expected confidences.
+  for (int index = 0; index < confidence_scores_.size(); ++index) {
+    const float* confidence_mask = reinterpret_cast<const float*>(
+        confidence_masks.confidence_mask(index).value().data());
+    EXPECT_EQ(confidence_mask[0], confidence_scores_[index]);
+  }
+}
+
+TEST_F(PostprocessTest, SucceedsWithConfidenceMaskAndOrientation) {
+  ImageSegmenterOptions options;
+  options.set_output_type(ImageSegmenterOptions::CONFIDENCE_MASK);
+  options.mutable_model_file_with_metadata()->set_file_name(JoinPath(
+      "./" /*test src dir*/, kTestDataDirectory, kDeepLabV3));
+  // Frame buffer with kRightBottom orientation.
+  std::unique_ptr<FrameBuffer> frame_buffer = CreateFromRgbaRawBuffer(
+      /*input=*/nullptr, {}, FrameBuffer::Orientation::kRightBottom);
+
+  SetUp(options);
+  ASSERT_TRUE(test_image_segmenter_ != nullptr) << init_status_;
+  SUPPORT_ASSERT_OK_AND_ASSIGN(const TfLiteTensor* output_tensor,
+                       FillAndGetOutputTensor());
+  SUPPORT_ASSERT_OK_AND_ASSIGN(SegmentationResult result,
+                       test_image_segmenter_->Postprocess(
+                           {output_tensor}, *frame_buffer, /*roi=*/{}));
+
+  EXPECT_EQ(result.segmentation_size(), 1);
+  const Segmentation& segmentation = result.segmentation(0);
+  ExpectApproximatelyEqual(
+      segmentation, ParseTextProtoOrDie<Segmentation>(kDeepLabV3PartialResult));
+  EXPECT_TRUE(segmentation.has_confidence_masks());
+  const Segmentation::ConfidenceMasks confidence_masks =
+      segmentation.confidence_masks();
+  EXPECT_EQ(confidence_masks.confidence_mask_size(), confidence_scores_.size());
+  // Check top-left corner has expected confidences.
+  for (int index = 0; index < confidence_scores_.size(); ++index) {
+    const float* confidence_mask = reinterpret_cast<const float*>(
+        confidence_masks.confidence_mask(index).value().data());
+    EXPECT_EQ(confidence_mask[/*width*/ 257 * /*height*/ 257 - 1],
+              confidence_scores_[index]);
+  }
 }
 
 }  // namespace

@@ -18,8 +18,8 @@ limitations under the License.
 
 #include <memory>
 
-#include "absl/base/macros.h"
-#include "absl/status/status.h"
+#include "absl/base/macros.h"  // from @com_google_absl
+#include "absl/status/status.h"  // from @com_google_absl
 #include "tensorflow/lite/core/api/op_resolver.h"
 #include "tensorflow/lite/kernels/op_macros.h"
 #include "tensorflow_lite_support/cc/port/configuration_proto_inc.h"
@@ -130,11 +130,27 @@ class TaskAPIFactory {
           tflite::support::TfLiteSupportStatus::kInvalidArgumentError);
     }
 
+    int num_threads = base_options->compute_settings()
+                          .tflite_settings()
+                          .cpu_settings()
+                          .num_threads();
+    if (num_threads == 0 || num_threads < -1) {
+      return CreateStatusWithPayload(
+          absl::StatusCode::kInvalidArgument,
+          "`num_threads` must be greater than 0 or equal to -1.",
+          tflite::support::TfLiteSupportStatus::kInvalidArgumentError);
+    }
+
     auto engine = absl::make_unique<TfLiteEngine>(std::move(resolver));
+    tflite::proto::ComputeSettings compute_settings(
+        base_options->compute_settings());
+    if (compute_settings.has_settings_to_test_locally()) {
+      RETURN_IF_ERROR(SetMiniBenchmarkFileNameFromBaseOptions(compute_settings,
+                                                              base_options));
+    }
     RETURN_IF_ERROR(engine->BuildModelFromExternalFileProto(
-        &base_options->model_file(), base_options->compute_settings()));
-    return CreateFromTfLiteEngine<T>(std::move(engine),
-                                     base_options->compute_settings());
+        &base_options->model_file(), compute_settings));
+    return CreateFromTfLiteEngine<T>(std::move(engine), compute_settings);
   }
 
  private:
@@ -159,6 +175,10 @@ class TaskAPIFactory {
     RETURN_IF_ERROR(engine->InitInterpreter(compute_settings));
     return absl::make_unique<T>(std::move(engine));
   }
+
+  static absl::Status SetMiniBenchmarkFileNameFromBaseOptions(
+      tflite::proto::ComputeSettings& compute_settings,
+      const BaseOptions* base_options);
 };
 
 }  // namespace core

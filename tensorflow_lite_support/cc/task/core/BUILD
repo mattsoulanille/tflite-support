@@ -1,7 +1,7 @@
 load("@org_tensorflow//tensorflow/lite/core/shims:cc_library_with_tflite.bzl", "cc_library_with_tflite")
 
 package(
-    default_visibility = ["//tensorflow_lite_support:users"],
+    default_visibility = ["//tensorflow_lite_support:internal"],
     licenses = ["notice"],  # Apache 2.0
 )
 
@@ -22,6 +22,9 @@ cc_library_with_tflite(
         "@org_tensorflow//tensorflow/lite/core/shims:framework",
         "@org_tensorflow//tensorflow/lite/core/shims:verifier",
         "//tensorflow_lite_support/cc/port:tflite_wrapper",
+    ],
+    visibility = [
+        "//tensorflow_lite_support:internal",
     ],
     deps = [
         ":error_reporter",
@@ -46,6 +49,9 @@ cc_library_with_tflite(
         ":tflite_engine",
         "//tensorflow_lite_support/cc/port:tflite_wrapper",
     ],
+    visibility = [
+        "//tensorflow_lite_support:internal",
+    ],
     deps = [
         "//tensorflow_lite_support/cc:common",
         "//tensorflow_lite_support/cc/port:status_macros",
@@ -58,10 +64,14 @@ cc_library_with_tflite(
 
 cc_library_with_tflite(
     name = "task_api_factory",
+    srcs = ["task_api_factory.cc"],
     hdrs = ["task_api_factory.h"],
     tflite_deps = [
         ":base_task_api",
         ":tflite_engine",
+    ],
+    visibility = [
+        "//tensorflow_lite_support:internal",
     ],
     deps = [
         "//tensorflow_lite_support/cc/port:configuration_proto_inc",
@@ -81,10 +91,18 @@ cc_library(
     name = "task_utils",
     srcs = ["task_utils.cc"],
     hdrs = ["task_utils.h"],
+    visibility = [
+        "//tensorflow_lite_support:internal",
+    ],
     deps = [
+        "//tensorflow_lite_support/cc:common",
+        "//tensorflow_lite_support/cc/port:status_macros",
+        "//tensorflow_lite_support/cc/port:statusor",
         "//tensorflow_lite_support/metadata:metadata_schema_cc",
         "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/status",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
         "@flatbuffers",
         "@org_tensorflow//tensorflow/lite:string_util",
         "@org_tensorflow//tensorflow/lite:type_to_tflitetype",
@@ -96,13 +114,18 @@ cc_library(
 cc_library(
     name = "category",
     hdrs = ["category.h"],
+    visibility = [
+        "//tensorflow_lite_support:internal",
+    ],
 )
 
 cc_library(
     name = "external_file_handler",
     srcs = ["external_file_handler.cc"],
     hdrs = ["external_file_handler.h"],
-    visibility = ["//visibility:public"],
+    visibility = [
+        "//tensorflow_lite_support:internal",
+    ],
     deps = [
         "//tensorflow_lite_support/cc:common",
         "//tensorflow_lite_support/cc/port:integral_types",

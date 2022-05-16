@@ -17,8 +17,8 @@ limitations under the License.
 
 #include <memory>
 
-#include "absl/flags/flag.h"
-#include "absl/status/status.h"
+#include "absl/flags/flag.h"  // from @com_google_absl
+#include "absl/status/status.h"  // from @com_google_absl
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/core/shims/cc/shims_test_util.h"
 #include "tensorflow/lite/kernels/builtin_op_kernels.h"
@@ -34,8 +34,8 @@ limitations under the License.
 #include "tensorflow_lite_support/cc/task/vision/proto/image_embedder_options_proto_inc.h"
 #include "tensorflow_lite_support/cc/task/vision/utils/frame_buffer_common_utils.h"
 #include "tensorflow_lite_support/cc/task/vision/utils/frame_buffer_utils.h"
+#include "tensorflow_lite_support/cc/task/vision/utils/image_utils.h"
 #include "tensorflow_lite_support/cc/test/test_utils.h"
-#include "tensorflow_lite_support/examples/task/vision/desktop/utils/image_utils.h"
 
 namespace tflite {
 namespace task {
@@ -50,7 +50,8 @@ using ::tflite::support::TfLiteSupportStatus;
 using ::tflite::task::JoinPath;
 
 constexpr char kTestDataDirectory[] =
-    "tensorflow_lite_support/cc/test/testdata/task/vision/";
+    "/tensorflow_lite_support/cc/test/testdata/task/"
+    "vision/";
 // Test model. Float inputs, produces feature vectors that are not
 // L2-normalized as this model doesn't include a L2_NORMALIZATION TFLite Op.
 constexpr char kMobileNetV3[] = "mobilenet_v3_small_100_224_embedder.tflite";

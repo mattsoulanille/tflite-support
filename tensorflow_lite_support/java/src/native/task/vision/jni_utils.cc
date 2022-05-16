@@ -15,7 +15,7 @@ limitations under the License.
 
 #include "tensorflow_lite_support/java/src/native/task/vision/jni_utils.h"
 
-#include "absl/strings/str_cat.h"
+#include "absl/strings/str_cat.h"  // from @com_google_absl
 #include "tensorflow_lite_support/cc/port/status_macros.h"
 #include "tensorflow_lite_support/cc/task/vision/core/frame_buffer.h"
 #include "tensorflow_lite_support/cc/task/vision/utils/frame_buffer_common_utils.h"
@@ -27,7 +27,7 @@ namespace vision {
 
 using ::tflite::support::StatusOr;
 using ::tflite::support::utils::GetMappedFileBuffer;
-using ::tflite::support::utils::kAssertionError;
+using ::tflite::support::utils::kIllegalStateException;
 using ::tflite::support::utils::ThrowException;
 using ::tflite::task::vision::CreateFromRawBuffer;
 
@@ -81,7 +81,7 @@ FrameBuffer::Format ConvertToFrameBufferFormat(JNIEnv* env,
       break;
   }
   // Should never happen.
-  ThrowException(env, kAssertionError,
+  ThrowException(env, kIllegalStateException,
                  "The color space type is unsupported: %d", jcolor_space_type);
   return FrameBuffer::Format::kRGB;
 }
@@ -107,7 +107,7 @@ FrameBuffer::Orientation ConvertToFrameBufferOrientation(JNIEnv* env,
       return FrameBuffer::Orientation::kLeftBottom;
   }
   // Should never happen.
-  ThrowException(env, kAssertionError,
+  ThrowException(env, kIllegalStateException,
                  "The FrameBuffer Orientation type is unsupported: %d",
                  jorientation);
   return FrameBuffer::Orientation::kTopLeft;
@@ -155,7 +155,7 @@ StatusOr<std::unique_ptr<FrameBuffer>> CreateFrameBufferFromBytes(
   env->SetLongArrayRegion(jbyte_array_handle, 0, 1, &jimage_ptr_handle);
 
   if (jimage_ptr == NULL) {
-    ThrowException(env, kAssertionError,
+    ThrowException(env, kIllegalStateException,
                    "Error occurred when reading image data from byte array.");
     return nullptr;
   }

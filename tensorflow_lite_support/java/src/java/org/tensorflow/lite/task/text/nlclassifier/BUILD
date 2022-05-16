@@ -3,7 +3,7 @@ load("@org_tensorflow//tensorflow/lite/java:aar_with_jni.bzl", "aar_with_jni")
 load("@build_bazel_rules_android//android:rules.bzl", "android_library")
 
 package(
-    default_visibility = ["//tensorflow_lite_support:users"],
+    default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
@@ -37,7 +37,8 @@ android_library(
         "//tensorflow_lite_support/java:tensorflowlite_support_java",
         "//tensorflow_lite_support/java/src/java/org/tensorflow/lite/task/core:base_task_api",
         "@com_google_auto_value",
-        "@org_tensorflow//tensorflow/lite/java:tensorflowlite_java",
+        "@maven//:androidx_annotation_annotation",
+        "@org_tensorflow//tensorflow/lite/java:tensorflowlite_java_stable",
     ],
 )
 

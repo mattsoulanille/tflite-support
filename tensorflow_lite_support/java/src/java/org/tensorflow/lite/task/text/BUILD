@@ -2,7 +2,7 @@ load("@org_tensorflow//tensorflow/lite/core/shims:cc_library_with_tflite.bzl", "
 load("@org_tensorflow//tensorflow/lite/java:aar_with_jni.bzl", "aar_with_jni")
 
 package(
-    default_visibility = ["//tensorflow_lite_support:users"],
+    default_visibility = ["//visibility:public"],
     licenses = ["notice"],  # Apache 2.0
 )
 
@@ -13,6 +13,7 @@ android_library_with_tflite(
     srcs = [
         "//tensorflow_lite_support/java/src/java/org/tensorflow/lite/task/text/nlclassifier:nl_classifier_src",
         "//tensorflow_lite_support/java/src/java/org/tensorflow/lite/task/text/qa:bert_question_answerer_src",
+        "//tensorflow_lite_support/java/src/java/org/tensorflow/lite/task/text/searcher:text_searcher_src",
     ],
     javacopts = ["-source 7 -target 7"],
     manifest = "AndroidManifest.xml",
@@ -25,7 +26,8 @@ android_library_with_tflite(
         "//tensorflow_lite_support/java:tensorflowlite_support_java",
         "//tensorflow_lite_support/java/src/java/org/tensorflow/lite/task/core:base_task_api",
         "@com_google_auto_value",
-        "@org_tensorflow//tensorflow/lite/java:tensorflowlite_java",
+        "@maven//:androidx_annotation_annotation",
+        "@org_tensorflow//tensorflow/lite/java:tensorflowlite_java_stable",
     ],
     # LINT.ThenChange(<INTERNAL>/release/build_task_pom.sh:dep)
 )
@@ -37,4 +39,10 @@ android_library_with_tflite(
 aar_with_jni(
     name = "task-library-text",
     android_library = ":task_library_text",
+    headers = [
+        "//tensorflow_lite_support/c/task/text:bert_nl_classifier.h",
+        "//tensorflow_lite_support/c/task/text:nl_classifier.h",
+        "//tensorflow_lite_support/c/task/text:nl_classifier_common.h",
+        "//tensorflow_lite_support/c/task/text:bert_question_answerer.h",
+    ],
 )

@@ -15,7 +15,7 @@ limitations under the License.
 
 package org.tensorflow.lite.support.image;
 
-import static org.tensorflow.lite.support.common.SupportPreconditions.checkArgument;
+import static org.tensorflow.lite.support.common.internal.SupportPreconditions.checkArgument;
 
 import android.graphics.Bitmap;
 import android.media.Image;
@@ -44,7 +44,7 @@ import org.tensorflow.lite.support.tensorbuffer.TensorBuffer;
  *
  * <p>IMPORTANT: all methods are not proved thread-safe.
  *
- * @see ImageProcessor which is often used for transforming a {@link TensorImage}.
+ * @see ImageProcessor which is often used for transforming a {@code TensorImage}.
  */
 // TODO(b/138907116): Support loading images from TensorBuffer with properties.
 // TODO(b/138905544): Support directly loading RGBBytes, YUVBytes and other types if necessary.
@@ -248,7 +248,7 @@ public class TensorImage {
    * <p>The main usage of this method is to load an {@link android.media.Image} object as model
    * input to the <a href="TFLite Task
    * Library">https://www.tensorflow.org/lite/inference_with_metadata/task_library/overview</a>.
-   * {@link TensorImage} backed by {@link android.media.Image} is not supported by {#link
+   * {@link TensorImage} backed by {@link android.media.Image} is not supported by {@link
    * ImageProcessor}.
    *
    * <p>* @throws IllegalArgumentException if the {@link android.graphics.ImageFormat} of {@code

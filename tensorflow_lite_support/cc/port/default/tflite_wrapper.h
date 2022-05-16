@@ -16,13 +16,15 @@ limitations under the License.
 #define TENSORFLOW_LITE_SUPPORT_CC_PORT_DEFAULT_TFLITE_WRAPPER_H_
 
 #include <memory>
+#include <string>
 #include <utility>
 
-#include "absl/status/status.h"
+#include "absl/status/status.h"  // from @com_google_absl
 #include "flatbuffers/flatbuffers.h"  // from @flatbuffers
 #include "tensorflow/lite/c/common.h"
 #include "tensorflow/lite/experimental/acceleration/configuration/configuration.pb.h"
 #include "tensorflow/lite/experimental/acceleration/configuration/delegate_registry.h"
+#include "tensorflow/lite/experimental/acceleration/mini_benchmark/mini_benchmark.h"
 #include "tensorflow/lite/interpreter.h"
 #include "tensorflow/lite/interpreter_builder.h"
 
@@ -34,8 +36,27 @@ namespace support {
 // retains ownership of the included options, and will ensure that they remain
 // valid for the duration of the created interpreter's lifetime.
 struct InterpreterCreationResources {
+  // The delegate created, based on the parameters in `ComputeSettings`.
+  // `TfLiteInterpreterWrapper` exclusively owns the `TfLiteDelegate` object,
+  // and maintains it through out the lifetime of `TfLiteInterpreterWrapper`.
+  TfLiteDelegate* optional_delegate;
+
+  // Number of threads to use, or -1 to use the default number of threads.
+  int num_threads = -1;
+
   // Apply the InterpreterCreationResources to the InterpreterBuilder.
-  void ApplyTo(tflite::InterpreterBuilder*) const {}
+  // Note: caller is responsible for ensuring that arguments are valid,
+  // e.g. that num_threads >= -1.
+  void ApplyTo(tflite::InterpreterBuilder* interpreter_builder) const {
+    if (optional_delegate != nullptr) {
+      interpreter_builder->AddDelegate(optional_delegate);
+    }
+    if (num_threads != -1) {
+      // We ignore the TfLiteStatus return value here; caller is responsible
+      // for checking that num_threads is valid.
+      (void)interpreter_builder->SetNumThreads(num_threads);
+    }
+  }
 };
 
 // Wrapper for a TfLiteInterpreter that may be accelerated [1]. Meant to be
@@ -51,8 +72,8 @@ struct InterpreterCreationResources {
 //   performant acceleration for the case where input size changes frequently.
 //
 // IMPORTANT: The only supported delegates are (as defined in [1]) NONE, GPU,
-// HEXAGON and NNAPI. Trying to use this class with EDGETPU or XNNPACK delegates
-// will cause an UnimplementedError to be thrown at initialization time.
+// HEXAGON, NNAPI, EDGETPU (Google internal), and EDGETPU_CORAL. Specifying
+// another delegate type may cause an UnimplementedError to be thrown.
 //
 // Like TfLiteInterpreter, this class is thread-compatible. Use from multiple
 // threads must be guarded by synchronization outside this class.
@@ -61,7 +82,14 @@ struct InterpreterCreationResources {
 // https://github.com/tensorflow/tensorflow/blob/master/tensorflow/lite/experimental/acceleration/configuration/configuration.proto
 class TfLiteInterpreterWrapper {
  public:
-  TfLiteInterpreterWrapper();
+  // Creates an instance to be associated with a TfLite model that could be
+  // identified by (`default_model_namespace`, `default_model_id`). Note the
+  // model identifier is generally used for the sake of logging.
+  TfLiteInterpreterWrapper(const std::string& default_model_namespace,
+                           const std::string& default_model_id);
+  TfLiteInterpreterWrapper()
+      : TfLiteInterpreterWrapper("org.tensorflow.lite.support",
+                                 "unknown_model_id") {}
 
   virtual ~TfLiteInterpreterWrapper() = default;
 
@@ -78,10 +106,6 @@ class TfLiteInterpreterWrapper {
   // This flag allows callers to rely on this function whether or not they
   // actually want fallback to happen; if they don't, it will ensure that the
   // configuration doesn't accidentally trigger fallback.
-  //
-  // IMPORTANT: Supported delegate type includes: NONE, NNAPI, GPU, HEXAGON,
-  // XNNPACK, EDGETPU (Google internal), and EDGETPU_CORAL. Specifying another
-  // delegate type may cause an UnimplementedError to be thrown.
   absl::Status InitializeWithFallback(
       std::function<absl::Status(const InterpreterCreationResources&,
                                  std::unique_ptr<tflite::Interpreter>*)>
@@ -145,6 +169,18 @@ class TfLiteInterpreterWrapper {
   // Whether an error has occurred with the delegate.
   bool HasDelegateError() { return got_error_do_not_delegate_anymore_; }
 
+  // Whether the on-device mini-benchmark has completed for those TfLite
+  // acceleration configurations that are specified in passed-in
+  // ComputeSettings. If it finishes, the next time this same InterpreterWrapper
+  // object is created (i.e. w/ the same model and the same
+  // mini-benchmark-related configurations), the best acceleration configuration
+  // will be picked up and used.
+  bool HasMiniBenchmarkCompleted();
+
+  const tflite::proto::ComputeSettings& compute_settings() const {
+    return compute_settings_;
+  }
+
  protected:
   // The delegate used to accelerate inference.
   Interpreter::TfLiteDelegatePtr delegate_;
@@ -173,6 +209,9 @@ class TfLiteInterpreterWrapper {
   absl::Status LoadDelegatePlugin(const std::string&,
                                   const tflite::TFLiteSettings&);
 
+  std::string ModelNamespace();
+  std::string ModelID();
+
   // The interpreter instance being used.
   std::unique_ptr<tflite::Interpreter> interpreter_;
   // The function used to initialize the interpreter and store it into the
@@ -185,6 +224,8 @@ class TfLiteInterpreterWrapper {
       interpreter_initializer_;
 
   // The ComputeSettings provided at initialization time.
+  // Note when TfLite mini-benchmark is enabled, it could be changed to the
+  // best TfLite acceleration setting selected.
   tflite::proto::ComputeSettings compute_settings_;
 
   // Set to true if an occurs with the specified delegate (if any), causing
@@ -194,6 +235,9 @@ class TfLiteInterpreterWrapper {
   // Fallback behavior as specified through the ComputeSettings.
   bool fallback_on_compilation_error_;
   bool fallback_on_execution_error_;
+
+  std::string default_model_namespace_;
+  std::string default_model_id_;
 
   // Used to convert the ComputeSettings proto to FlatBuffer format.
   flatbuffers::FlatBufferBuilder flatbuffers_builder_;
@@ -219,6 +263,8 @@ class TfLiteInterpreterWrapper {
     }
   };
   CancelFlag cancel_flag_;
+
+  std::unique_ptr<tflite::acceleration::MiniBenchmark> mini_benchmark_;
 
   // Sets up the TFLite invocation cancellation by
   // tflite::Interpreter::SetCancellationFunction().

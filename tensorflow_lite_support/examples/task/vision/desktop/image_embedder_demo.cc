@@ -26,10 +26,10 @@ limitations under the License.
 
 #include <iostream>
 
-#include "absl/flags/flag.h"
-#include "absl/flags/parse.h"
-#include "absl/status/status.h"
-#include "absl/strings/str_format.h"
+#include "absl/flags/flag.h"  // from @com_google_absl
+#include "absl/flags/parse.h"  // from @com_google_absl
+#include "absl/status/status.h"  // from @com_google_absl
+#include "absl/strings/str_format.h"  // from @com_google_absl
 #include "tensorflow_lite_support/cc/port/statusor.h"
 #include "tensorflow_lite_support/cc/task/core/external_file_handler.h"
 #include "tensorflow_lite_support/cc/task/core/proto/external_file_proto_inc.h"
@@ -37,7 +37,7 @@ limitations under the License.
 #include "tensorflow_lite_support/cc/task/vision/proto/embeddings_proto_inc.h"
 #include "tensorflow_lite_support/cc/task/vision/proto/image_embedder_options_proto_inc.h"
 #include "tensorflow_lite_support/cc/task/vision/utils/frame_buffer_common_utils.h"
-#include "tensorflow_lite_support/examples/task/vision/desktop/utils/image_utils.h"
+#include "tensorflow_lite_support/cc/task/vision/utils/image_utils.h"
 
 ABSL_FLAG(std::string, model_path, "",
           "Absolute path to the '.tflite' image embedder model.");

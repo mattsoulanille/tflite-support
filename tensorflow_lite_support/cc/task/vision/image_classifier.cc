@@ -15,9 +15,9 @@ limitations under the License.
 
 #include "tensorflow_lite_support/cc/task/vision/image_classifier.h"
 
-#include "absl/algorithm/container.h"
-#include "absl/strings/str_format.h"
-#include "absl/strings/string_view.h"
+#include "absl/algorithm/container.h"  // from @com_google_absl
+#include "absl/strings/str_format.h"  // from @com_google_absl
+#include "absl/strings/string_view.h"  // from @com_google_absl
 #include "flatbuffers/flatbuffers.h"  // from @flatbuffers
 #include "tensorflow_lite_support/cc/common.h"
 #include "tensorflow_lite_support/cc/port/integral_types.h"
@@ -45,26 +45,6 @@ using ::tflite::support::TfLiteSupportStatus;
 using ::tflite::task::core::AssertAndReturnTypedTensor;
 using ::tflite::task::core::TaskAPIFactory;
 using ::tflite::task::core::TfLiteEngine;
-
-// Default score value used as a fallback for classes that (1) have no score
-// calibration data or (2) have a very low confident uncalibrated score, i.e.
-// lower than the `min_uncalibrated_score` threshold.
-//
-// (1) This happens when the ScoreCalibration does not cover all the classes
-// listed in the label map. This can be used to enforce the blacklisting of
-// given classes so that they are never returned.
-//
-// (2) This is an optional threshold provided part of the calibration data. It
-// is used to mitigate false alarms on some classes.
-//
-// In both cases, a class that gets assigned a score of -1 is never returned as
-// it gets discarded by the `score_threshold` check (see post-processing logic).
-constexpr float kDefaultCalibratedScore = -1.0f;
-
-// Calibrated scores should be in the [0, 1] range, otherwise an error is
-// returned at post-processing time.
-constexpr float kMinCalibratedScore = 0.0f;
-constexpr float kMaxCalibratedScore = 1.0f;
 
 }  // namespace
 
@@ -169,11 +149,11 @@ absl::Status ImageClassifier::PreInit() {
 absl::Status ImageClassifier::PostInit() { return InitScoreCalibrations(); }
 
 absl::Status ImageClassifier::CheckAndSetOutputs() {
-  num_outputs_ = TfLiteEngine::OutputCount(engine_->interpreter());
+  num_outputs_ = TfLiteEngine::OutputCount(GetTfLiteEngine()->interpreter());
 
   // Perform sanity checks and extract metadata.
   const ModelMetadataExtractor* metadata_extractor =
-      engine_->metadata_extractor();
+      GetTfLiteEngine()->metadata_extractor();
 
   const flatbuffers::Vector<flatbuffers::Offset<tflite::TensorMetadata>>*
       output_tensor_metadata = metadata_extractor->GetOutputTensorMetadata();
@@ -228,7 +208,7 @@ absl::Status ImageClassifier::CheckAndSetOutputs() {
   int num_quantized_outputs = 0;
   for (int i = 0; i < num_outputs_; ++i) {
     const TfLiteTensor* output_tensor =
-        TfLiteEngine::GetOutput(engine_->interpreter(), i);
+        TfLiteEngine::GetOutput(GetTfLiteEngine()->interpreter(), i);
     const int num_dimensions = output_tensor->dims->size;
     if (num_dimensions == 4) {
       if (output_tensor->dims->data[1] != 1 ||
@@ -378,12 +358,6 @@ absl::Status ImageClassifier::InitScoreCalibrations() {
       continue;
     }
 
-    // Use a specific default score instead of the one specified by default in
-    // cc/task/vision/utils/score_calibration.h. See `kDefaultCalibratedScore`
-    // documentation for more details.
-    classification_heads_[i].calibration_params->default_score =
-        kDefaultCalibratedScore;
-
     score_calibrations_[i] = absl::make_unique<ScoreCalibration>();
     if (score_calibrations_[i] == nullptr) {
       return CreateStatusWithPayload(
@@ -433,16 +407,16 @@ StatusOr<ClassificationResult> ImageClassifier::Postprocess(
 
     const TfLiteTensor* output_tensor = output_tensors[i];
     if (has_uint8_outputs_) {
-      const uint8* output_data =
-          AssertAndReturnTypedTensor<uint8>(output_tensor);
+      ASSIGN_OR_RETURN(const uint8* output_data,
+                       AssertAndReturnTypedTensor<uint8>(output_tensor));
       for (int j = 0; j < head.label_map_items.size(); ++j) {
         score_pairs.emplace_back(j, output_tensor->params.scale *
                                         (static_cast<int>(output_data[j]) -
                                          output_tensor->params.zero_point));
       }
     } else {
-      const float* output_data =
-          AssertAndReturnTypedTensor<float>(output_tensor);
+      ASSIGN_OR_RETURN(const float* output_data,
+                       AssertAndReturnTypedTensor<float>(output_tensor));
       for (int j = 0; j < head.label_map_items.size(); ++j) {
         score_pairs.emplace_back(j, output_data[j]);
       }
@@ -453,23 +427,20 @@ StatusOr<ClassificationResult> ImageClassifier::Postprocess(
       for (auto& score_pair : score_pairs) {
         const std::string& class_name =
             head.label_map_items[score_pair.first].name;
+
+        // In ComputeCalibratedScore, score_pair.second is set to the
+        // default_score value from metadata [1] if the category (1) has no
+        // score calibration data or (2) has a very low confident uncalibrated
+        // score, i.e. lower than the `min_uncalibrated_score` threshold.
+        // Otherwise, score_pair.second is calculated based on the selected
+        // score transformation function, and the value is guaranteed to be in
+        // the range of [0, scale], where scale is a label-dependent sigmoid
+        // parameter.
+        //
+        // [1]:
+        // https://github.com/tensorflow/tflite-support/blob/af26cb6952ccdeee0e849df2b93dbe7e57f6bc48/tensorflow_lite_support/metadata/metadata_schema.fbs#L453
         score_pair.second = score_calibrations_[i]->ComputeCalibratedScore(
             class_name, score_pair.second);
-        if (score_pair.second > kMaxCalibratedScore) {
-          return CreateStatusWithPayload(
-              StatusCode::kInternal,
-              absl::StrFormat("calibrated score is too high: got %f, expected "
-                              "%f as maximum.",
-                              score_pair.second, kMaxCalibratedScore));
-        }
-        if (score_pair.second != kDefaultCalibratedScore &&
-            score_pair.second < kMinCalibratedScore) {
-          return CreateStatusWithPayload(
-              StatusCode::kInternal,
-              absl::StrFormat("calibrated score is too low: got %f, expected "
-                              "%f as minimum.",
-                              score_pair.second, kMinCalibratedScore));
-        }
       }
     }
 

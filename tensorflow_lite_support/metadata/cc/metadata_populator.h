@@ -16,8 +16,8 @@ limitations under the License.
 #ifndef TENSORFLOW_LITE_SUPPORT_METADATA_CC_METADATA_POPULATOR_H_
 #define TENSORFLOW_LITE_SUPPORT_METADATA_CC_METADATA_POPULATOR_H_
 
-#include "absl/container/flat_hash_map.h"
-#include "absl/status/status.h"
+#include "absl/container/flat_hash_map.h"  // from @com_google_absl
+#include "absl/status/status.h"  // from @com_google_absl
 #include "flatbuffers/flatbuffers.h"  // from @flatbuffers
 #include "tensorflow/lite/schema/schema_generated.h"
 #include "tensorflow_lite_support/cc/port/statusor.h"
@@ -30,6 +30,8 @@ namespace metadata {
 
 // Provides an interface to pack TFLite ModelMetadata [1] and corresponding
 // associated files into a TFLite FlatBuffer.
+//
+// This class is NOT thread-safe.
 //
 // [1]: https://www.tensorflow.org/lite/convert/metadata
 class ModelMetadataPopulator {

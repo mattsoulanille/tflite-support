@@ -20,14 +20,16 @@ limitations under the License.
 #include <memory>
 #include <string>
 
-#include "absl/status/status.h"
-#include "absl/strings/str_cat.h"
-#include "absl/strings/str_format.h"
-#include "include/libyuv.h"
+#include "absl/status/status.h"  // from @com_google_absl
+#include "absl/strings/str_cat.h"  // from @com_google_absl
+#include "absl/strings/str_format.h"  // from @com_google_absl
+#include "libyuv.h"  // from @libyuv
+#include "libyuv/convert_argb.h"  // from @libyuv
 #include "tensorflow_lite_support/cc/common.h"
 #include "tensorflow_lite_support/cc/port/integral_types.h"
 #include "tensorflow_lite_support/cc/port/status_macros.h"
 #include "tensorflow_lite_support/cc/port/statusor.h"
+#include "tensorflow_lite_support/cc/task/vision/core/frame_buffer.h"
 #include "tensorflow_lite_support/cc/task/vision/utils/frame_buffer_common_utils.h"
 
 namespace tflite {
@@ -547,6 +549,20 @@ absl::Status ConvertFromRgb(const FrameBuffer& buffer,
     if (output_buffer->format() == FrameBuffer::Format::kNV12 ||
         output_buffer->format() == FrameBuffer::Format::kNV21) {
       return ConvertFromYv(*yuv_frame_buffer, output_buffer);
+    }
+    return absl::OkStatus();
+  } else if (output_buffer->format() == FrameBuffer::Format::kRGBA) {
+    // RGB24 is BGR in memory and ARGB is BGRA in memory. The additional of the
+    // alpha channel will not impact the RGB ordering.
+    int ret = libyuv::RGB24ToARGB(
+        buffer.plane(0).buffer, buffer.plane(0).stride.row_stride_bytes,
+        const_cast<uint8*>(output_buffer->plane(0).buffer),
+        output_buffer->plane(0).stride.row_stride_bytes,
+        buffer.dimension().width, buffer.dimension().height);
+    if (ret != 0) {
+      return CreateStatusWithPayload(
+          StatusCode::kInternal, "Libyuv RAWToARGB operation failed.",
+          TfLiteSupportStatus::kImageProcessingBackendError);
     }
     return absl::OkStatus();
   }
@@ -1324,6 +1340,7 @@ absl::Status CropResize(const FrameBuffer& buffer, int x0, int y0, int x1,
           TfLiteSupportStatus::kImageProcessingError);
   }
 }
+
 }  // namespace
 
 absl::Status LibyuvFrameBufferUtils::Crop(const FrameBuffer& buffer, int x0,

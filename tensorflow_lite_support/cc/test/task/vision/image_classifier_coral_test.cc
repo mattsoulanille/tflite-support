@@ -15,7 +15,7 @@ limitations under the License.
 
 #include <memory>
 
-#include "absl/status/status.h"
+#include "absl/status/status.h"  // from @com_google_absl
 #include "tensorflow_lite_support/cc/port/configuration_proto_inc.h"
 #include "tensorflow_lite_support/cc/port/gmock.h"
 #include "tensorflow_lite_support/cc/port/gtest.h"
@@ -26,7 +26,7 @@ limitations under the License.
 #include "tensorflow_lite_support/cc/task/vision/proto/classifications_proto_inc.h"
 #include "tensorflow_lite_support/cc/task/vision/proto/image_classifier_options_proto_inc.h"
 #include "tensorflow_lite_support/cc/task/vision/utils/frame_buffer_common_utils.h"
-#include "tensorflow_lite_support/examples/task/vision/desktop/utils/image_utils.h"
+#include "tensorflow_lite_support/cc/task/vision/utils/image_utils.h"
 
 namespace tflite {
 namespace task {

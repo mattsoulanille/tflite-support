@@ -2,7 +2,7 @@ load("@org_tensorflow//tensorflow/lite/core/shims:cc_library_with_tflite.bzl", "
 
 package(
     default_visibility = [
-        "//tensorflow_lite_support:users",
+        "//tensorflow_lite_support:internal",
     ],
     licenses = ["notice"],  # Apache 2.0
 )
@@ -11,6 +11,9 @@ cc_library(
     name = "score_calibration",
     srcs = ["score_calibration.cc"],
     hdrs = ["score_calibration.h"],
+    visibility = [
+        "//tensorflow_lite_support:internal",
+    ],
     deps = [
         "//tensorflow_lite_support/cc:common",
         "//tensorflow_lite_support/cc/port:status_macros",
@@ -55,6 +58,9 @@ cc_library(
     hdrs = [
         "frame_buffer_utils.h",
     ],
+    visibility = [
+        "//tensorflow_lite_support:internal",
+    ],
     deps = [
         ":frame_buffer_common_utils",
         ":libyuv_frame_buffer_utils",
@@ -69,6 +75,7 @@ cc_library(
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/types:optional",
         "@com_google_absl//absl/types:variant",
+        "@com_google_glog//:glog",
         "@org_tensorflow//tensorflow/lite/kernels:op_macros",
         "@org_tensorflow//tensorflow/lite/kernels/internal:compatibility",
     ],
@@ -78,6 +85,9 @@ cc_library(
     name = "libyuv_frame_buffer_utils",
     srcs = ["libyuv_frame_buffer_utils.cc"],
     hdrs = ["libyuv_frame_buffer_utils.h"],
+    visibility = [
+        "//tensorflow_lite_support:internal",
+    ],
     deps = [
         ":frame_buffer_common_utils",
         "//tensorflow_lite_support/cc:common",
@@ -109,5 +119,26 @@ cc_library_with_tflite(
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/types:optional",
         "@org_tensorflow//tensorflow/lite/c:common",
+    ],
+)
+
+cc_library(
+    name = "image_utils",
+    srcs = ["image_utils.cc"],
+    hdrs = ["image_utils.h"],
+    visibility = [
+        "//tensorflow_lite_support:internal",
+    ],
+    deps = [
+        "//tensorflow_lite_support/cc/port:integral_types",
+        "//tensorflow_lite_support/cc/port:status_macros",
+        "//tensorflow_lite_support/cc/port:statusor",
+        "//tensorflow_lite_support/cc/task/vision/core:frame_buffer",
+        "//tensorflow_lite_support/cc/task/vision/utils:frame_buffer_common_utils",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
+        "@stblib//:stb_image",
+        "@stblib//:stb_image_write",
     ],
 )

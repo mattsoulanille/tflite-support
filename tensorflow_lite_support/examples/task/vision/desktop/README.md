@@ -3,34 +3,25 @@
 This folder contains simple command-line tools for easily trying out the C++
 Vision Task APIs.
 
-## Coral integration
+## Coral Integration
 
 Task Library now supports fast TFLite inference delegated onto
-[Coral Edge TPU devices][4]. See the
+[Coral Edge TPU devices][4] on Linux and macOS. See the
 [documentation](https://www.tensorflow.org/lite/inference_with_metadata/task_library/overview#run_task_library_with_delegates)
-for more details. To run the demo on a Coral device, add the following
-configurations to the bazel command:
+for more details.
+
+To run the demo on a Coral device, add `--define darwinn_portable=1` to the
+bazel command.
+
+Note the `libusb` package is required. It can be installed as follows:
 
 ```bash
-# On the Linux
-CORAL_SETTING="--define darwinn_portable=1 --linkopt=-lusb-1.0"
-# On the Mac, add '--linkopt=-lusb-1.0 --linkopt=-L/opt/local/lib/' if you are
-# using MacPorts or '--linkopt=-lusb-1.0 --linkopt=-L/opt/homebrew/lib' if you
-# are using Homebrew.
-CORAL_SETTING="--define darwinn_portable=1 --linkopt=-L/opt/local/lib/ --linkopt=-lusb-1.0"
-# Windows is not supported yet.
-```
-
-Note, the `libusb-1.0-0-dev` package is required. It can be installed as
-follows:
-
-```bash
-# On the Linux
+# On Linux
 sudo apt-get install libusb-1.0-0-dev
 
-# On the macOS
+# On macOS using MacPorts
 port install libusb
-# or
+# or Homebrew
 brew install libusb
 ```
 
@@ -72,9 +63,8 @@ $(pwd)/tensorflow_lite_support/examples/task/vision/desktop/g3doc/sparrow.jpg \
  --max_results=3
 ```
 
-To run the demo on a [Coral Edge TPU device][4], create the Coral
-configurations, `CORAL_SETTING` (see the section,
-[Coral integration](#coral-integration)), then run:
+To run the demo on a [Coral Edge TPU device][4], check
+[Coral Integration](#coral-integration) section and then run:
 
 ```bash
 # Download the Coral model:
@@ -83,7 +73,7 @@ curl \
  -o /tmp/mobilenet_v2_1.0_224_inat_bird_quant_edgetpu.tflite
 
 # Run the classification tool:
-bazel run -c opt ${CORAL_SETTING} \
+bazel run -c opt --define darwinn_portable=1 \
  tensorflow_lite_support/examples/task/vision/desktop:image_classifier_demo -- \
  --model_path=/tmp/mobilenet_v2_1.0_224_inat_bird_quant_edgetpu.tflite \
  --image_path=\
@@ -148,9 +138,8 @@ $(pwd)/tensorflow_lite_support/examples/task/vision/desktop/g3doc/dogs.jpg \
  --max_results=2
 ```
 
-To run the demo on a [Coral Edge TPU device][4], create the Coral
-configurations, `CORAL_SETTING` (see the section,
-[Coral integration](#coral-integration)), then run:
+To run the demo on a [Coral Edge TPU device][4], check
+[Coral Integration](#coral-integration) section and then run:
 
 ```bash
 # Download the model:
@@ -159,13 +148,14 @@ curl \
  -o /tmp/ssd_mobilenet_v1_coco_quant_postprocess_edgetpu.tflite
 
 # Run the detection tool:
-bazel run -c opt \
+bazel run -c opt --define darwinn_portable=1 \
  tensorflow_lite_support/examples/task/vision/desktop:object_detector_demo -- \
  --model_path=/tmp/ssd_mobilenet_v1_coco_quant_postprocess_edgetpu.tflite \
  --image_path=\
 $(pwd)/tensorflow_lite_support/examples/task/vision/desktop/g3doc/dogs.jpg \
  --output_png=/tmp/detection-output.png \
- --max_results=2
+ --max_results=2 \
+ --use_coral=true
 ```
 
 #### Results
@@ -225,23 +215,23 @@ $(pwd)/tensorflow_lite_support/examples/task/vision/desktop/g3doc/cat.jpg \
  --output_mask_png=/tmp/segmentation-output.png
 ```
 
-To run the demo on a [Coral Edge TPU device][4], create the Coral
-configurations, `CORAL_SETTING` (see the section,
-[Coral integration](#coral-integration)), then run:
+To run the demo on a [Coral Edge TPU device][4], check
+[Coral Integration](#coral-integration) section and then run:
 
 ```bash
 # Download the model:
-curl
+curl \
  -L 'https://github.com/google-coral/test_data/raw/master/keras_post_training_unet_mv2_128_quant_edgetpu.tflite' \
  -o /tmp/keras_post_training_unet_mv2_128_quant_edgetpu.tflite
 
 # Run the segmentation tool:
-bazel run -c opt \
+bazel run -c opt --define darwinn_portable=1 \
  tensorflow_lite_support/examples/task/vision/desktop:image_segmenter_demo -- \
  --model_path=/tmp/keras_post_training_unet_mv2_128_quant_edgetpu.tflite \
  --image_path=\
 $(pwd)/tensorflow_lite_support/examples/task/vision/desktop/g3doc/cat.jpg \
- --output_mask_png=/tmp/segmentation-output.png
+ --output_mask_png=/tmp/segmentation-output.png \
+ --use_coral=true
 ```
 
 #### Results
@@ -269,7 +259,110 @@ And `/tmp/segmentation-output.jpg` should contain the segmentation mask:
 
 ![segmentation-output](g3doc/segmentation-output.png)
 
+## ImageEmbedder
+
+#### Prerequisites
+
+You will need:
+
+*   a TFLite image embedder model (e.g. [mobilenet v3][5], a generic image
+    embedder trained on ImageNet),
+*   two PNG, JPEG or GIF image to extract embeddings from.
+
+#### Usage
+
+The ImageEmbedder demo tool takes two images as inputs, and outputs the
+[cosine similarity][6] between their embeddings.
+
+In the console, run:
+
+```bash
+# Download the model:
+curl \
+ -L 'https://tfhub.dev/google/lite-model/imagenet/mobilenet_v3_small_100_224/feature_vector/5/metadata/1?lite-format=tflite' \
+ -o /tmp/mobilenet_v3_embedder.tflite
+
+# Run the embedder tool:
+bazel run -c opt \
+tensorflow_lite_support/examples/task/vision/desktop:image_embedder_demo -- \
+--model_path=/tmp/mobilenet_v3_embedder.tflite \
+--l2_normalize \
+--first_image_path=$(pwd)/tensorflow_lite_support/cc/test/testdata/task/vision/burger.jpg \
+--second_image_path=$(pwd)/tensorflow_lite_support/cc/test/testdata/task/vision/burger_crop.jpg
+```
+
+#### Results
+
+In the console, you should get:
+
+```
+Cosine similarity: 0.932738
+```
+
+## ImageSearcher
+
+#### Prerequisites
+
+You will need:
+
+*   a TFLite image embedder model (e.g. [mobilenet v3][5], a generic image
+    embedder trained on ImageNet),
+*   an index built from that embedder model using [Model Maker][7].
+
+Model Maker also provides the ability to add the index directly to the embedder
+model metadata. The demo also supports this : just omit the `--index_path`
+argument.
+
+#### Usage
+
+In this example, we'll be using a test index built from the mobilenet v3
+embedder model, which only contains 5 embeddings extracted from images of a
+burger, a cat, a dog, a bird and a car.
+
+In the console, run:
+
+```bash
+# Download the model:
+curl \
+ -L 'https://tfhub.dev/google/lite-model/imagenet/mobilenet_v3_small_100_224/feature_vector/5/metadata/1?lite-format=tflite' \
+ -o /tmp/mobilenet_v3_embedder.tflite
+
+# Run the searcher tool:
+bazel run -c opt \
+tensorflow_lite_support/examples/task/vision/desktop:image_searcher_demo -- \
+--model_path=/tmp/mobilenet_v3_embedder.tflite \
+--l2_normalize \
+--index_path=$(pwd)/third_party/tensorflow_lite_support/cc/test/testdata/task/vision/searcher_index.ldb \
+--image_path=$(pwd)/third_party/tensorflow_lite_support/cc/test/testdata/task/vision/burger_crop.jpg
+```
+
+#### Results
+
+In the console, you should get:
+
+```
+Results:
+ Rank#0:
+  metadata: burger
+  distance: 0.13452
+ Rank#1:
+  metadata: car
+  distance: 1.81935
+ Rank#2:
+  metadata: bird
+  distance: 1.96617
+ Rank#3:
+  metadata: dog
+  distance: 2.05610
+ Rank#4:
+  metadata: cat
+  distance: 2.06347
+```
+
 [1]: https://tfhub.dev/google/lite-model/aiy/vision/classifier/birds_V1/3
 [2]: https://tfhub.dev/tensorflow/lite-model/ssd_mobilenet_v1/1/metadata/2
 [3]: https://tfhub.dev/tensorflow/lite-model/deeplabv3/1/metadata/2
 [4]: https://coral.ai/docs/edgetpu/inference/
+[5]: https://tfhub.dev/google/lite-model/imagenet/mobilenet_v3_small_100_224/feature_vector/5/metadata/1
+[6]: https://en.wikipedia.org/wiki/Cosine_similarity
+[7]: https://www.tensorflow.org/lite/api_docs/python/tflite_model_maker/searcher
