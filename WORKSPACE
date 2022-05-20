@@ -553,11 +553,19 @@ arm_linux_toolchain_configure(
 )
 
 # Emscripten toolchain
+#http_archive(
+#    name = "emsdk",
+#    sha256 = "7a58a9996b113d3e0675df30b5f17e28aa47de2e684a844f05394fe2f6f12e8e",
+#    strip_prefix = "emsdk-c1589b55641787d55d53e883852035beea9aec3f/bazel",
+#    url = "https://github.com/emscripten-core/emsdk/archive/c1589b55641787d55d53e883852035beea9aec3f.tar.gz",
+#)
+
 http_archive(
     name = "emsdk",
-    sha256 = "7a58a9996b113d3e0675df30b5f17e28aa47de2e684a844f05394fe2f6f12e8e",
-    strip_prefix = "emsdk-c1589b55641787d55d53e883852035beea9aec3f/bazel",
-    url = "https://github.com/emscripten-core/emsdk/archive/c1589b55641787d55d53e883852035beea9aec3f.tar.gz",
+#    repo_mapping = {"@nodejs": "@nodejs_host"},
+    sha256 = "7dc13d967705582e11ff62ae143425dbc63c38372f1a1b14f0cb681fda413714",
+    strip_prefix = "emsdk-3.1.4/bazel",
+    urls = ["https://github.com/emscripten-core/emsdk/archive/refs/tags/3.1.4.tar.gz"],
 )
 
 load("@emsdk//:deps.bzl", emsdk_deps = "deps")
