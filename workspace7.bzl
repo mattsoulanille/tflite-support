@@ -5,6 +5,7 @@ Partial workspace defintion for the TFLite Support Library. See WORKSPACE for us
 load("@robolectric//bazel:robolectric.bzl", "robolectric_repositories")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("//third_party/flatbuffers:workspace.bzl", flatbuffers = "repo")
+load("@emsdk//:emscripten_deps.bzl", emsdk_emscripten_deps = "emscripten_deps")
 
 def tflite_support_workspace7():
     """Partial workspace definition for the TFLite Support Library. See WORKSPACE for usage."""
@@ -20,3 +21,6 @@ def tflite_support_workspace7():
         sha256 = "cd1a77b7b02e8e008439ca76fd34f5b07aecb8c752961f9640dea15e9e5ba1ca",
         url = "https://github.com/bazelbuild/rules_jvm_external/archive/refs/tags/%s.zip" % RULES_JVM_EXTERNAL_TAG,
     )
+
+    # Emscripten deps
+    emsdk_emscripten_deps()

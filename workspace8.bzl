@@ -6,6 +6,7 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_tools//tools/build_defs/repo:java.bzl", "java_import_external")
 load("@libedgetpu//:workspace.bzl", "libedgetpu_dependencies")
 load("//third_party/tensorflow:version.bzl", "TENSORFLOW_COMMIT", "TENSORFLOW_SHA256")
+load("@emsdk//:deps.bzl", emsdk_deps = "deps")
 
 def tflite_support_workspace8():
     """Partial workspace definition for the TFLite Support Library. See WORKSPACE for usage."""
@@ -80,3 +81,6 @@ def tflite_support_workspace8():
         urls = ["https://github.com/robolectric/robolectric-bazel/archive/4.7.3.tar.gz"],
         strip_prefix = "robolectric-bazel-4.7.3",
     )
+
+    # Emscripten dependencies
+    emsdk_deps()

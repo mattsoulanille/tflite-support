@@ -385,3 +385,11 @@ def tflite_support_workspace9():
         strip_prefix = "snappy-1.1.8",
         urls = ["https://github.com/google/snappy/archive/1.1.8.tar.gz"],
     )
+
+    http_archive(
+        name = "emsdk",
+        #    repo_mapping = {"@nodejs": "@nodejs_host"},
+        sha256 = "1aa5365ccb2147701cc9d1e59a5a49577c1d6aea55da7c450df2d5ffa48b8a58",
+        strip_prefix = "emsdk-3.1.24/bazel",
+        urls = ["https://github.com/emscripten-core/emsdk/archive/refs/tags/3.1.24.tar.gz"],
+    )
