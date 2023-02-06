@@ -16,7 +16,7 @@
 import dataclasses
 from typing import Optional
 
-from tensorflow_lite_support.python.task.core.proto import base_options_pb2
+from tensorflow_lite_support.python.task.core import base_options as base_options_module
 from tensorflow_lite_support.python.task.processor.proto import bounding_box_pb2
 from tensorflow_lite_support.python.task.processor.proto import classification_options_pb2
 from tensorflow_lite_support.python.task.processor.proto import classifications_pb2
@@ -26,12 +26,18 @@ from tensorflow_lite_support.python.task.vision.pybinds import _pywrap_image_cla
 
 _CppImageClassifier = _pywrap_image_classifier.ImageClassifier
 _ClassificationOptions = classification_options_pb2.ClassificationOptions
-_BaseOptions = base_options_pb2.BaseOptions
+_BaseOptions = base_options_module.BaseOptions
 
 
 @dataclasses.dataclass
 class ImageClassifierOptions:
-  """Options for the image classifier task."""
+  """Options for the image classifier task.
+
+  Attributes:
+    base_options: Base options for the image classifier task.
+    classification_options: Classification options for the image classifier
+      task.
+  """
   base_options: _BaseOptions
   classification_options: _ClassificationOptions = _ClassificationOptions()
 
@@ -52,6 +58,7 @@ class ImageClassifier(object):
 
     Args:
       file_path: Path to the model.
+
     Returns:
       `ImageClassifier` object that's created from the model file.
     Raises:
@@ -70,6 +77,7 @@ class ImageClassifier(object):
 
     Args:
       options: Options for the image classifier task.
+
     Returns:
       `ImageClassifier` object that's created from `options`.
     Raises:
@@ -78,7 +86,7 @@ class ImageClassifier(object):
       RuntimeError: If other types of error occurred.
     """
     classifier = _CppImageClassifier.create_from_options(
-        options.base_options, options.classification_options)
+        options.base_options.to_pb2(), options.classification_options.to_pb2())
     return cls(options, classifier)
 
   def classify(
@@ -104,9 +112,12 @@ class ImageClassifier(object):
     """
     image_data = image_utils.ImageData(image.buffer)
     if bounding_box is None:
-      return self._classifier.classify(image_data)
-
-    return self._classifier.classify(image_data, bounding_box.to_pb2())
+      classification_result = self._classifier.classify(image_data)
+    else:
+      classification_result = self._classifier.classify(image_data,
+                                                        bounding_box.to_pb2())
+    return classifications_pb2.ClassificationResult.create_from_pb2(
+        classification_result)
 
   @property
   def options(self) -> ImageClassifierOptions:

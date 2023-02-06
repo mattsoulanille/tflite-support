@@ -19,20 +19,25 @@ from tensorflow_lite_support.python.task.audio.core import audio_record
 from tensorflow_lite_support.python.task.audio.core import tensor_audio
 from tensorflow_lite_support.python.task.audio.core.pybinds import _pywrap_audio_buffer
 from tensorflow_lite_support.python.task.audio.pybinds import _pywrap_audio_embedder
-from tensorflow_lite_support.python.task.core.proto import base_options_pb2
+from tensorflow_lite_support.python.task.core import base_options as base_options_module
 from tensorflow_lite_support.python.task.processor.proto import embedding_options_pb2
 from tensorflow_lite_support.python.task.processor.proto import embedding_pb2
 
 _CppAudioFormat = _pywrap_audio_buffer.AudioFormat
 _CppAudioBuffer = _pywrap_audio_buffer.AudioBuffer
 _CppAudioEmbedder = _pywrap_audio_embedder.AudioEmbedder
-_BaseOptions = base_options_pb2.BaseOptions
+_BaseOptions = base_options_module.BaseOptions
 _EmbeddingOptions = embedding_options_pb2.EmbeddingOptions
 
 
 @dataclasses.dataclass
 class AudioEmbedderOptions:
-  """Options for the audio embedder task."""
+  """Options for the audio embedder task.
+
+  Attributes:
+    base_options: Base options for the audio embedder task.
+    embedding_options: Embedding options for the audio embedder task.
+  """
   base_options: _BaseOptions
   embedding_options: _EmbeddingOptions = _EmbeddingOptions()
 
@@ -81,8 +86,8 @@ class AudioEmbedder(object):
       `AudioEmbedderOptions` such as missing the model.
       RuntimeError: If other types of error occurred.
     """
-    embedder = _CppAudioEmbedder.create_from_options(options.base_options,
-                                                     options.embedding_options)
+    embedder = _CppAudioEmbedder.create_from_options(
+        options.base_options.to_pb2(), options.embedding_options.to_pb2())
     return cls(options, embedder)
 
   def create_input_tensor_audio(self) -> tensor_audio.TensorAudio:
@@ -119,13 +124,14 @@ class AudioEmbedder(object):
       ValueError: If any of the input arguments is invalid.
       RuntimeError: If failed to calculate the embedding vector.
     """
-    return self._embedder.embed(
+    embedding_result = self._embedder.embed(
         _CppAudioBuffer(audio.buffer, audio.buffer_size, audio.format))
+    return embedding_pb2.EmbeddingResult.create_from_pb2(embedding_result)
 
   def cosine_similarity(self, u: embedding_pb2.FeatureVector,
                         v: embedding_pb2.FeatureVector) -> float:
     """Computes cosine similarity [1] between two feature vectors."""
-    return self._embedder.cosine_similarity(u, v)
+    return self._embedder.cosine_similarity(u.to_pb2(), v.to_pb2())
 
   def get_embedding_dimension(self, output_index: int) -> int:
     """Gets the dimensionality of the embedding output.

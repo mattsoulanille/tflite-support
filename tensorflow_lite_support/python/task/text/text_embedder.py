@@ -15,19 +15,24 @@
 
 import dataclasses
 
-from tensorflow_lite_support.python.task.core.proto import base_options_pb2
+from tensorflow_lite_support.python.task.core import base_options as base_options_module
 from tensorflow_lite_support.python.task.processor.proto import embedding_options_pb2
 from tensorflow_lite_support.python.task.processor.proto import embedding_pb2
 from tensorflow_lite_support.python.task.text.pybinds import _pywrap_text_embedder
 
 _CppTextEmbedder = _pywrap_text_embedder.TextEmbedder
-_BaseOptions = base_options_pb2.BaseOptions
+_BaseOptions = base_options_module.BaseOptions
 _EmbeddingOptions = embedding_options_pb2.EmbeddingOptions
 
 
 @dataclasses.dataclass
 class TextEmbedderOptions:
-  """Options for the text embedder task."""
+  """Options for the text embedder task.
+
+  Attributes:
+    base_options: Base options for the text embedder task.
+    embedding_options: Embedding options for the text embedder task.
+  """
   base_options: _BaseOptions
   embedding_options: _EmbeddingOptions = _EmbeddingOptions()
 
@@ -74,8 +79,8 @@ class TextEmbedder(object):
         `TextEmbedderOptions` such as missing the model.
       RuntimeError: If other types of error occurred.
     """
-    embedder = _CppTextEmbedder.create_from_options(options.base_options,
-                                                    options.embedding_options)
+    embedder = _CppTextEmbedder.create_from_options(
+        options.base_options.to_pb2(), options.embedding_options.to_pb2())
     return cls(options, embedder)
 
   def embed(self, text: str) -> embedding_pb2.EmbeddingResult:
@@ -91,12 +96,13 @@ class TextEmbedder(object):
       ValueError: If any of the input arguments is invalid.
       RuntimeError: If failed to calculate the embedding vector.
     """
-    return self._embedder.embed(text)
+    embedding_result = self._embedder.embed(text)
+    return embedding_pb2.EmbeddingResult.create_from_pb2(embedding_result)
 
   def cosine_similarity(self, u: embedding_pb2.FeatureVector,
                         v: embedding_pb2.FeatureVector) -> float:
     """Computes cosine similarity [1] between two feature vectors."""
-    return self._embedder.cosine_similarity(u, v)
+    return self._embedder.cosine_similarity(u.to_pb2(), v.to_pb2())
 
   def get_embedding_dimension(self, output_index: int) -> int:
     """Gets the dimensionality of the embedding output.
