@@ -3,7 +3,7 @@ Configures the TF version used by the TFLite Support library.
 """
 
 # TF on 2023-10-06.
-TENSORFLOW_COMMIT = "c6a0d64b990bbe4410052af66991ab9e0786eda9"
+TENSORFLOW_COMMIT = "6887368d6d46223f460358323c4b76d61d1558a8"
 
 # curl -L https://github.com/tensorflow/tensorflow/archive/<TENSORFLOW_COMMIT>.tar.gz | sha256sum
-TENSORFLOW_SHA256 = "a64335ff5457c47daf5c9b86f708473596edcae839bc93401bf606aba95a4ebb"
+TENSORFLOW_SHA256 = "bb25fa4574e42ea4d452979e1d2ba3b86b39569d6b8106a846a238b880d73652"
